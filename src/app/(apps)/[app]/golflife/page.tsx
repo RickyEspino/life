@@ -1,10 +1,17 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import React, { useEffect, useMemo, useState } from "react";
 
 /**
- * BeachLife 5-Tab App UI Mockup (React + Tailwind)
- * v4.1: Minor a11y/ESLint refinements (button type, aria-current, modal roles).
+ * GolfLife 5-Tab App UI Mockup (React + Tailwind)
+ * Core Pages: ⛳ Now, 🗺 Map, 🎥 Reels, 🏌️ Community, 👤 Me
+ * - Immediate snapshot of what’s happening on the course
+ * - Full-screen interactive map with pins for tee boxes, holes, and pro shop
+ * - GolfReels for short videos and highlights
+ * - Community hub for golfers
+ * - Personal dashboard with wallet, points, and roles
+ * Tailwind: ensure darkMode: 'class'.
  */
 
 type Route = "now" | "map" | "reels" | "community" | "me";
@@ -16,8 +23,7 @@ function readHash(): Route {
   return (ROUTES.includes(raw as Route) ? (raw as Route) : "now");
 }
 
-export default function BeachLifeAppMock() {
-  // Router
+export default function GolfLifeAppMock() {
   const [activeTab, setActiveTab] = useState<Route>(readHash());
   useEffect(() => {
     const onHash = () => setActiveTab(readHash());
@@ -29,7 +35,6 @@ export default function BeachLifeAppMock() {
     else setActiveTab(r);
   };
 
-  // Theme
   const [dark, setDark] = useState(false);
   useEffect(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("theme") : null;
@@ -42,36 +47,23 @@ export default function BeachLifeAppMock() {
     }
   }, [dark]);
 
-  // Demo QR modal
-  const [qrOpen, setQrOpen] = useState(false);
-
-  // Demo progress
-  const points = 375;
-  const nextMilestone = 500;
+  const points = 880;
+  const nextMilestone = 1000;
   const pct = Math.min(100, Math.round((points / nextMilestone) * 100));
-
-  // Progress math
-  const size = 120;
-  const stroke = 12;
+  const size = 120, stroke = 12;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const dash = useMemo(() => (pct / 100) * c, [pct, c]);
 
-  // Me sub-tabs
   const [meTab, setMeTab] = useState<"profile" | "wallet" | "activity">("profile");
 
   return (
     <div className={dark ? "dark" : ""}>
-      <div className="min-h-dvh w-full bg-gradient-to-b from-[#FDECC8] via-white to-[#E6F7F5] text-slate-800 flex flex-col dark:from-[#0B1220] dark:via-[#0E1626] dark:to-[#0B1220] dark:text-slate-100">
-        {/* Content (no header) */}
+      <div className="min-h-dvh w-full bg-gradient-to-b from-green-100 via-white to-green-50 text-slate-800 flex flex-col dark:from-[#0B2E1C] dark:via-[#0C3B24] dark:to-[#0B2E1C] dark:text-slate-100">
         <main className="mx-auto w-full max-w-screen-sm flex-1 px-4 pb-28 pt-4">
-          {activeTab === "now" && <NowTab openQR={() => setQrOpen(true)} />}
+          {activeTab === "now" && <NowTab navigate={navigate} dark={dark} setDark={setDark} />}
           {activeTab === "map" && <MapTab />}
-          {activeTab === "reels" && (
-            <ReelsTab>
-              <ReelCard />
-            </ReelsTab>
-          )}
+          {activeTab === "reels" && <ReelsTab />}
           {activeTab === "community" && <CommunityTab />}
           {activeTab === "me" && (
             <MeTab
@@ -85,11 +77,10 @@ export default function BeachLifeAppMock() {
           )}
         </main>
 
-        {/* Bottom Nav */}
-        <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-white/60 bg-white/80 backdrop-blur dark:bg-slate-900/70 dark:border-white/10">
+        <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-green-200 bg-white/80 backdrop-blur dark:bg-slate-900/70 dark:border-white/10">
           <div className="mx-auto max-w-screen-sm grid grid-cols-5 text-xs">
             <NavItem label="Now" active={activeTab === "now"} onClick={() => navigate("now")}>
-              <FlameIcon className="w-6 h-6" />
+              <GolfIcon className="w-6 h-6" />
             </NavItem>
             <NavItem label="Map" active={activeTab === "map"} onClick={() => navigate("map")}>
               <MapIcon className="w-6 h-6" />
@@ -105,42 +96,172 @@ export default function BeachLifeAppMock() {
             </NavItem>
           </div>
         </nav>
-
-        {/* QR Modal */}
-        {qrOpen && <QrModal onClose={() => setQrOpen(false)} />}
       </div>
     </div>
   );
 }
 
-/* ---- Simplified helpers (safe placeholders) ---- */
+/* ================= Tabs ================= */
 
-function NowTab({ openQR }: { openQR: () => void }) {
+function NowTab({
+  navigate,
+  dark,
+  setDark,
+}: {
+  navigate: (r: Route) => void;
+  dark: boolean;
+  setDark: (v: boolean) => void;
+}) {
+  const items = [
+    { title: "⛳ Tee Time in 15 min", sub: "Hole 1 • Sunrise Course" },
+    { title: "🍹 19th Hole Happy Hour", sub: "Clubhouse Bar • 5–7pm" },
+    { title: "🏌️ Long Drive Contest", sub: "Range • 3pm" },
+  ];
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((p) => (p + 1) % items.length), 4000);
+    return () => clearInterval(t);
+  }, [items.length]);
+  const cur = items[i];
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:bg-slate-900 dark:border-white/10">
-      NowTab content (dummy){" "}
-      <button type="button" onClick={openQR} className="ml-2 rounded-full bg-[#FF6A5A] px-3 py-1.5 text-white text-sm">
-        Open QR
-      </button>
+    <div className="space-y-4">
+      <div className="relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-r from-green-600 via-green-500 to-green-400 shadow-soft">
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/15 rounded-full blur-2xl" />
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold">{cur.title}</h2>
+            <p className="text-white/90">{cur.sub}</p>
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => alert("⛳ Booking flow (demo)")}
+                className="rounded-full bg-white/90 text-green-700 text-sm px-4 py-2 font-semibold hover:bg-white"
+              >
+                Book Now
+              </button>
+              <a
+                href="#/map"
+                className="rounded-full border border-white/70 text-white text-sm px-4 py-2 font-semibold hover:bg-white/10"
+              >
+                See Map
+              </a>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDark(!dark)}
+            className="p-2 rounded-full bg-white/90 text-green-800 hover:bg-white"
+            aria-label="Toggle theme"
+            title="Toggle theme"
+          >
+            <ThemeIcon className="w-5 h-5" dark={dark} />
+          </button>
+        </div>
+        <div className="absolute bottom-3 right-4 flex gap-1.5">
+          {items.map((_, idx) => (
+            <span key={idx} className={`h-1.5 w-3 rounded-full ${idx === i ? "bg-white" : "bg-white/50"}`} />
+          ))}
+        </div>
+      </div>
+
+      <Section title="On the Course Now">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <LiveCard
+            badge="Friends"
+            title="Alex & Jamie teeing off"
+            sub="Hole 5 • 200yds away"
+            ctaLabel="Join"
+          />
+          <LiveCard
+            badge="Bonus"
+            title="Earn 100 BP for hitting the range"
+            sub="Practice Range • Today"
+            ctaLabel="Check in"
+          />
+        </div>
+      </Section>
+
+      <Section title="Trending at the Club">
+        <ImageScroll
+          cards={[
+            { img: "https://images.unsplash.com/photo-1508255139162-e1f7b5c8c1c6?q=80&w=1200&auto=format&fit=crop", title: "Pro Shop Deals", meta: "20% off golf balls" },
+            { img: "https://images.unsplash.com/photo-1505842465776-3b4953ca4f79?q=80&w=1200&auto=format&fit=crop", title: "Golf Cart Rentals", meta: "Half price twilight" },
+            { img: "https://images.unsplash.com/photo-1504271863819-df91df9a69a0?q=80&w=1200&auto=format&fit=crop", title: "Clubhouse Dinner", meta: "Live jazz Friday" },
+          ]}
+        />
+      </Section>
     </div>
   );
 }
 
 function MapTab() {
-  return <div className="rounded-xl border border-slate-200 bg-white p-4 dark:bg-slate-900 dark:border-white/10">MapTab (dummy)</div>;
+  return (
+    <div className="relative h-[70dvh] rounded-2xl overflow-hidden shadow-soft">
+      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop')] bg-cover bg-center opacity-70" />
+      <div className="absolute inset-0 bg-gradient-to-b from-green-200/30 to-green-500/40" />
+      <div className="absolute left-12 top-16 animate-bounce">
+        <Pin color="#7C6FC5" label="Hole 1" />
+      </div>
+      <div className="absolute right-16 top-24 animate-[bounce_1.2s_infinite]">
+        <Pin color="#2EC4B6" label="Clubhouse" />
+      </div>
+      <div className="absolute left-1/3 bottom-16 animate-[bounce_1.1s_infinite]">
+        <Pin color="#FF6A5A" label="Pro Shop" />
+      </div>
+    </div>
+  );
 }
 
-function ReelsTab({ children }: { children?: React.ReactNode }) {
+function ReelsTab() {
   return (
-    <div className="grid gap-3">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 dark:bg-slate-900 dark:border-white/10">ReelsTab</div>
-      {children}
+    <div className="space-y-4">
+      <div className="rounded-2xl p-4 bg-white/80 border border-slate-100 shadow-soft dark:bg-slate-900/60 dark:border-white/10">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">GolfReels</h3>
+          <button type="button" className="px-3 py-1.5 rounded-full bg-green-600 text-white text-sm font-semibold">
+            Upload Reel
+          </button>
+        </div>
+        <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">Clips from golfers on the course.</p>
+      </div>
+
+      <ReelCard user="@GolfProSam" caption="🏌️ Perfect swing this morning!" stats={{ waves: 88, shells: 14, suns: 10, fires: 6 }} img="https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1200&auto=format&fit=crop" />
+      <ReelCard user="@ClubLife" caption="Sunset over the 18th hole 🌅" stats={{ waves: 130, shells: 47, suns: 30, fires: 15 }} img="https://images.unsplash.com/photo-1505842078234-1c1d22b20f0b?q=80&w=1200&auto=format&fit=crop" />
     </div>
   );
 }
 
 function CommunityTab() {
-  return <div className="rounded-xl border border-slate-200 bg-white p-4 dark:bg-slate-900 dark:border-white/10">CommunityTab (dummy)</div>;
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl p-4 bg-white/80 border border-slate-100 shadow-soft dark:bg-slate-900/60 dark:border-white/10">
+        <h3 className="font-semibold">Clubhouse Chat</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Join leagues, share tips, and discuss all things golf.</p>
+      </div>
+
+      <Section title="Popular Groups">
+        <HorizontalChips items={["Weekend League", "Golf Travel", "Gear Talk", "19th Hole Stories"]} />
+      </Section>
+
+      <PostCard
+        user="@FairwayFan"
+        title="Best irons for mid-handicap?"
+        body="Looking for recommendations — what’s working for you guys?"
+        reactions={{ wave: 20, shell: 5, sun: 8, fish: 1 }}
+        comments={12}
+        tag="Gear"
+      />
+      <PostCard
+        user="@GreensGuru"
+        title="Anyone up for sunrise round?"
+        body="Thinking 6:30 tee-off tomorrow. DM me if interested."
+        reactions={{ wave: 33, shell: 11, sun: 22, fish: 4 }}
+        comments={6}
+        tag="Meetup"
+      />
+      <PollCard question="Pick next week’s club tournament day" options={["Sat", "Sun", "Mon"]} />
+    </div>
+  );
 }
 
 function MeTab({
@@ -159,143 +280,33 @@ function MeTab({
   progressRing: { size: number; stroke: number; r: number; c: number; dash: number };
 }) {
   return (
-    <div className="grid gap-3">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 dark:bg-slate-900 dark:border-white/10">
-        <div className="mb-2 text-sm text-slate-600 dark:text-slate-300">
-          {points} / {nextMilestone} BP • {pct}% to next level
+    <div className="space-y-4">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-green-700 via-green-600 to-green-500 text-white p-5 shadow-soft">
+        <div className="absolute -top-10 -left-10 w-40 h-40 bg-white/15 rounded-full blur-2xl" />
+        <div className="flex items-center gap-4">
+          <Avatar name="Ricky" />
+          <div className="flex-1">
+            <p className="text-white/80 text-sm">Welcome back</p>
+            <h3 className="text-xl font-semibold">Ricky Espino</h3>
+            <p className="text-white/90">Level 4 • Fairway Pro</p>
+          </div>
+          <div className="relative">
+            <svg width={progressRing.size} height={progressRing.size} className="rotate-[-90deg]">
+              <circle cx={progressRing.size / 2} cy={progressRing.size / 2} r={progressRing.r} stroke="rgba(255,255,255,0.25)" strokeWidth={progressRing.stroke} fill="none" />
+              <circle cx={progressRing.size / 2} cy={progressRing.size / 2} r={progressRing.r} stroke="#ffffff" strokeWidth={progressRing.stroke} strokeLinecap="round" strokeDasharray={progressRing.c} strokeDashoffset={Math.max(progressRing.c - progressRing.dash, 0)} fill="none" />
+            </svg>
+            <div className="absolute inset-0 grid place-items-center rotate-0">
+              <span className="text-center text-sm font-semibold leading-4">
+                {pct}%
+                <br />
+                <span className="text-[10px] font-normal">to L5</span>
+              </span>
+            </div>
+          </div>
         </div>
-        {/* progress ring (visual placeholder) */}
-        <svg width={progressRing.size} height={progressRing.size} className="rotate-[-90deg]">
-          <circle
-            cx={progressRing.size / 2}
-            cy={progressRing.size / 2}
-            r={progressRing.r}
-            stroke="rgba(0,0,0,0.1)"
-            strokeWidth={progressRing.stroke}
-            fill="none"
-          />
-          <circle
-            cx={progressRing.size / 2}
-            cy={progressRing.size / 2}
-            r={progressRing.r}
-            stroke="#FF6A5A"
-            strokeWidth={progressRing.stroke}
-            strokeLinecap="round"
-            strokeDasharray={progressRing.c}
-            strokeDashoffset={Math.max(progressRing.c - progressRing.dash, 0)}
-            fill="none"
-          />
-        </svg>
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white p-4 dark:bg-slate-900 dark:border-white/10">
-        <div className="mb-3 flex gap-2">
-          <button
-            type="button"
-            onClick={() => setMeTab("profile")}
-            className={`rounded-lg px-3 py-1.5 text-sm ${meTab === "profile" ? "bg-[#F6F0FF] text-[#7C6FC5]" : "bg-slate-100 dark:bg-white/10"}`}
-          >
-            Profile
-          </button>
-          <button
-            type="button"
-            onClick={() => setMeTab("wallet")}
-            className={`rounded-lg px-3 py-1.5 text-sm ${meTab === "wallet" ? "bg-[#F6F0FF] text-[#7C6FC5]" : "bg-slate-100 dark:bg-white/10"}`}
-          >
-            Wallet
-          </button>
-          <button
-            type="button"
-            onClick={() => setMeTab("activity")}
-            className={`rounded-lg px-3 py-1.5 text-sm ${meTab === "activity" ? "bg-[#F6F0FF] text-[#7C6FC5]" : "bg-slate-100 dark:bg白/10"}`}
-          >
-            Activity
-          </button>
-        </div>
-
-        <div className="text-sm text-slate-600 dark:text-slate-300">
-          MeTab (dummy with <RoleCard title="Owner Console" desc="Manage" />)
+        <div className="mt-3 text-sm text-white/90">
+          {points} / {nextMilestone} BP to next level
         </div>
       </div>
-    </div>
-  );
-}
 
-/* ---- Missing Components (simple placeholders) ---- */
-function ReelCard() {
-  return <div className="rounded-xl border border-slate-200 bg-white p-4 dark:bg-slate-900 dark:border-white/10">ReelCard placeholder</div>;
-}
-
-function RoleCard({ title, desc }: { title: string; desc: string }) {
-  return (
-    <div className="inline-block rounded-xl border border-slate-200 bg-white px-3 py-2 text-left dark:bg-slate-900 dark:border-white/10">
-      <h4 className="font-semibold">{title}</h4>
-      <p className="text-sm text-slate-500 dark:text-slate-400">{desc}</p>
-    </div>
-  );
-}
-
-/* ---- Basics ---- */
-function NavItem({
-  children,
-  label,
-  active,
-  onClick,
-}: {
-  children: React.ReactNode;
-  label: string;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-1 py-3 ${
-        active ? "text-[#FF6A5A]" : "text-slate-500 dark:text-slate-400"
-      }`}
-      aria-current={active ? "page" : undefined}
-    >
-      <div className={`transition ${active ? "scale-110" : "scale-100"}`}>{children}</div>
-      <span className="text-[11px] font-medium">{label}</span>
-    </button>
-  );
-}
-
-function QrModal({ onClose }: { onClose: () => void }) {
-  return (
-    <div
-      className="fixed inset-0 bg-black/50 grid place-items-center"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="qr-title"
-    >
-      <div className="bg-white p-4 rounded-xl dark:bg-slate-900 dark:text-slate-100">
-        <h3 id="qr-title" className="font-semibold mb-2">
-          QR Modal
-        </h3>
-        <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">QR Modal Placeholder</p>
-        <button type="button" onClick={onClose} className="rounded-md bg-[#FF6A5A] px-3 py-1.5 text-white text-sm">
-          Close
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ---- Icons (emoji placeholders for speed) ---- */
-function FlameIcon({ className = "" }: { className?: string }) {
-  return <span className={className} role="img" aria-label="flame">🔥</span>;
-}
-function MapIcon({ className = "" }: { className?: string }) {
-  return <span className={className} role="img" aria-label="map">🗺️</span>;
-}
-function ReelsIcon({ className = "" }: { className?: string }) {
-  return <span className={className} role="img" aria-label="reels">🎬</span>;
-}
-function CommunityIcon({ className = "" }: { className?: string }) {
-  return <span className={className} role="img" aria-label="community">💬</span>;
-}
-function UserIcon({ className = "" }: { className?: string }) {
-  return <span className={className} role="img" aria-label="user">👤</span>;
-}
+      <div className="rounded-2xl bg-white/80 border border-slate-100 shadow-soft dark:bg-s
