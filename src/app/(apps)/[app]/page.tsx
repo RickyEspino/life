@@ -4,16 +4,12 @@ import React, { useEffect, useMemo, useState } from "react";
 
 /**
  * BeachLife 5-Tab App UI Mockup (React + Tailwind)
- * v2: + QR Scan modal, + Dark Mode, + Hash-router scaffold, + “Happening Now” spec
+ * Variant: No header, no floating Scan button
+ * Includes: “Happening Now” spec, QR modal, hash-router, dark mode toggle (in hero CTA remains)
  * Drop into app/page.tsx. Tailwind required (darkMode: 'class').
  */
 
-/* =================== Router Scaffold ===================
-  Lightweight hash router so each tab has a URL:
-  #/now, #/map, #/reels, #/community, #/me
-  Works with browser back/forward and deep links.
-*/
-
+/* =================== Router Scaffold =================== */
 type Route = "now" | "map" | "reels" | "community" | "me";
 const ROUTES: Route[] = ["now", "map", "reels", "community", "me"];
 function readHash(): Route {
@@ -24,7 +20,7 @@ function readHash(): Route {
 
 /* =================== Root App =================== */
 export default function BeachLifeAppMock() {
-  // Router state
+  // Router
   const [activeTab, setActiveTab] = useState<Route>(readHash());
   useEffect(() => {
     const onHash = () => setActiveTab(readHash());
@@ -36,7 +32,7 @@ export default function BeachLifeAppMock() {
     else setActiveTab(r);
   };
 
-  // Theme (dark / light)
+  // Theme
   const [dark, setDark] = useState(false);
   useEffect(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("theme") : null;
@@ -44,22 +40,17 @@ export default function BeachLifeAppMock() {
     else setDark(window.matchMedia?.("(prefers-color-scheme: dark)").matches);
   }, []);
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("theme", dark ? "dark" : "light");
-    }
+    if (typeof window !== "undefined") localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
 
-  // QR Modal state
+  // QR modal
   const [qrOpen, setQrOpen] = useState(false);
 
-  // Demo progress (BeachPoints toward next level)
+  // Demo progress (for Me tab)
   const points = 375;
   const nextMilestone = 500;
   const pct = Math.min(100, Math.round((points / nextMilestone) * 100));
-
-  // Progress ring math
-  const size = 120;
-  const stroke = 12;
+  const size = 120, stroke = 12;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const dash = useMemo(() => (pct / 100) * c, [pct, c]);
@@ -70,48 +61,9 @@ export default function BeachLifeAppMock() {
   return (
     <div className={dark ? "dark" : ""}>
       <div className="min-h-dvh w-full bg-gradient-to-b from-[#FDECC8] via-white to-[#E6F7F5] text-slate-800 flex flex-col dark:from-[#0B1220] dark:via-[#0E1626] dark:to-[#0B1220] dark:text-slate-100">
-        {/* Top bar */}
-        <header className="sticky top-0 z-40 backdrop-blur bg-white/60 border-b border-white/40 dark:bg-slate-900/60 dark:border-white/10">
-          <div className="mx-auto max-w-screen-sm px-4 py-3 flex items-center gap-3">
-            <Logo />
-            <div className="flex-1">
-              <p className="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">BeachLife</p>
-              <h1 className="text-base font-semibold">
-                {activeTab === "now" && "Happening Now"}
-                {activeTab === "map" && "Map"}
-                {activeTab === "reels" && "BeachReels"}
-                {activeTab === "community" && "Community"}
-                {activeTab === "me" && "Me"}
-              </h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="relative p-2 rounded-full bg-white shadow-sm border border-slate-200 hover:shadow transition dark:bg-slate-800 dark:border-white/10"
-                title="Notifications"
-                aria-label="Notifications"
-              >
-                <BellIcon className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF6A5A] text-white text-[10px] px-1">
-                  3
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDark((d) => !d)}
-                className="p-2 rounded-full bg-white border border-slate-200 hover:shadow transition dark:bg-slate-800 dark:border-white/10"
-                title="Toggle theme"
-                aria-label="Toggle theme"
-              >
-                <ThemeIcon className="w-5 h-5" dark={dark} />
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* Content area */}
+        {/* Content area (no header) */}
         <main className="mx-auto w-full max-w-screen-sm flex-1 px-4 pb-28 pt-4">
-          {activeTab === "now" && <NowTab openQR={() => setQrOpen(true)} />}
+          {activeTab === "now" && <NowTab openQR={() => setQrOpen(true)} dark={dark} setDark={setDark} />}
           {activeTab === "map" && <MapTab />}
           {activeTab === "reels" && <ReelsTab />}
           {activeTab === "community" && <CommunityTab />}
@@ -126,17 +78,6 @@ export default function BeachLifeAppMock() {
             />
           )}
         </main>
-
-        {/* Floating Scan QR (primary action) */}
-        <button
-          type="button"
-          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 inline-flex items-center gap-2 rounded-full px-5 py-3 shadow-xl border border-white/70 text-white bg-gradient-to-r from-[#FF6A5A] to-[#7C6FC5] hover:scale-[1.02] active:scale-[0.98] transition"
-          onClick={() => setQrOpen(true)}
-          aria-label="Scan QR"
-        >
-          <ScanIcon className="w-5 h-5 text-white" />
-          <span className="font-semibold">Scan QR</span>
-        </button>
 
         {/* Bottom Nav (5 tabs) */}
         <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-white/60 bg-white/80 backdrop-blur dark:bg-slate-900/70 dark:border-white/10">
@@ -166,13 +107,18 @@ export default function BeachLifeAppMock() {
   );
 }
 
-/* =================== "Files" ===================
-  This single file mimics multiple modules for speed.
-  Later, split into: tabs/*, components/*, icons/*, etc.
-*/
+/* =================== Tabs =================== */
 
 /* ---------- tabs/NowTab.tsx ---------- */
-function NowTab({ openQR }: { openQR: () => void }) {
+function NowTab({
+  openQR,
+  dark,
+  setDark,
+}: {
+  openQR: () => void;
+  dark: boolean;
+  setDark: (v: boolean) => void;
+}) {
   const items = [
     { title: "🏖 Sunset Yoga in 30 min", sub: "Pier 14 • Free • Join the wave" },
     { title: "🍹 Happy Hour at Surf Bar", sub: "2–4pm • +75 BP bonus during happy hour" },
@@ -180,8 +126,21 @@ function NowTab({ openQR }: { openQR: () => void }) {
   ];
   return (
     <div className="space-y-4">
-      {/* Hero Banner (Rotating) */}
-      <HeroCarousel items={items} openQR={openQR} />
+      {/* Hero with internal actions (theme + Join/Map) */}
+      <HeroCarousel items={items} openQR={openQR}>
+        <div className="flex items-center gap-2">
+          {/* Small theme toggle since header is gone */}
+          <button
+            type="button"
+            onClick={() => setDark(!dark)}
+            className="p-2 rounded-full bg-white/90 text-slate-800 hover:bg-white"
+            aria-label="Toggle theme"
+            title="Toggle theme"
+          >
+            <ThemeIcon className="w-5 h-5" dark={dark} />
+          </button>
+        </div>
+      </HeroCarousel>
 
       {/* Live Activity Cards */}
       <Section title="Live Nearby">
@@ -426,151 +385,8 @@ function MeTab({
   );
 }
 
-/* ---------- components/panels/ProfilePanel.tsx ---------- */
-function ProfilePanel() {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Points" value="1,250" hint="Total balance" />
-        <StatCard label="Vouchers" value="3" hint="Active" />
-        <StatCard label="Streak" value="5" hint="days" />
-      </div>
-      <div className="rounded-xl border border-slate-100 bg-white p-4 dark:bg-slate-900/60 dark:border-white/10">
-        <h5 className="font-semibold">Active Challenges</h5>
-        <ul className="mt-2 space-y-2 text-sm">
-          <li className="flex items-center justify-between">
-            <span>Visit 3 food vendors</span>
-            <span className="text-slate-500 dark:text-slate-400">2/3</span>
-          </li>
-          <li className="flex items-center justify-between">
-            <span>Attend 1 live event</span>
-            <span className="text-slate-500 dark:text-slate-400">0/1</span>
-          </li>
-        </ul>
-      </div>
-    </div>
-  );
-}
+/* =================== Components =================== */
 
-/* ---------- components/panels/WalletPanel.tsx ---------- */
-function WalletPanel() {
-  return (
-    <div className="space-y-4">
-      {/* Balance */}
-      <div className="rounded-xl border border-slate-100 bg-white p-4 dark:bg-slate-900/60 dark:border-white/10">
-        <div className="flex items-center justify-between">
-          <h5 className="font-semibold">BeachPoints</h5>
-          <button type="button" className="px-3 py-1.5 rounded-full bg-[#2EC4B6] text-white text-sm font-semibold">
-            Transfer
-          </button>
-        </div>
-        <div className="mt-3 text-3xl font-bold">1,250 BP</div>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Earned this month: 325 • Redeemed: 200</p>
-      </div>
-
-      {/* Vouchers */}
-      <div className="rounded-xl border border-slate-100 bg-white p-4 dark:bg-slate-900/60 dark:border-white/10">
-        <div className="flex items-center justify-between">
-          <h5 className="font-semibold">Vouchers</h5>
-          <button type="button" className="text-sm text-[#7C6FC5] font-semibold">
-            View all
-          </button>
-        </div>
-        <div className="mt-3 grid gap-3">
-          <VoucherCard brand="Surf Shack" offer="15% off" expires="Sep 30" />
-          <VoucherCard brand="Sea Captain's House" offer="$10 off $50" expires="Oct 15" />
-          <VoucherCard brand="SkyWheel" offer="2 for 1" expires="Oct 1" disabled />
-        </div>
-      </div>
-
-      {/* Ledger */}
-      <div className="rounded-xl border border-slate-100 bg-white p-4 dark:bg-slate-900/60 dark:border-white/10">
-        <h5 className="font-semibold">History</h5>
-        <ul className="mt-3 divide-y divide-slate-100 dark:divide-white/10">
-          <LedgerItem label="Check-in @ Surf Shack" delta={+150} date="Sep 10" />
-          <LedgerItem label="Redeemed: Pier fries" delta={-75} date="Sep 08" />
-          <LedgerItem label="Daily streak bonus" delta={+25} date="Sep 07" />
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- components/panels/ActivityPanel.tsx ---------- */
-function ActivityPanel() {
-  return (
-    <div className="space-y-3">
-      <ActivityRow title="Joined Surf Crew group" time="2h ago" icon={<CommunityIcon className="w-5 h-5" />} />
-      <ActivityRow title="Posted in Community" time="5h ago" icon={<ChatIcon className="w-5 h-5" />} />
-      <ActivityRow title="Uploaded a Reel" time="1d ago" icon={<ReelsIcon className="w-5 h-5" />} />
-      <ActivityRow title="Scanned @ Sea Captain's House" time="2d ago" icon={<ScanIcon className="w-5 h-5" />} />
-    </div>
-  );
-}
-
-/* ---------- components/modals/QrModal.tsx ---------- */
-function QrModal({ onClose }: { onClose: () => void }) {
-  const [status, setStatus] = useState<"idle" | "scanning" | "success">("idle");
-
-  // Lock body scroll + ESC to close (nice UX)
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    const t = setTimeout(() => setStatus("scanning"), 300);
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener("keydown", onKey);
-      clearTimeout(t);
-    };
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 backdrop-blur" role="dialog" aria-modal="true" aria-labelledby="qr-title">
-      <div className="w-[92vw] max-w-sm rounded-2xl overflow-hidden bg-white shadow-2xl border border-slate-200 dark:bg-slate-900 dark:border-white/10">
-        <div className="p-4 flex items-center justify-between border-b border-slate-100 dark:border-white/10">
-          <h3 id="qr-title" className="font-semibold">
-            Scan QR
-          </h3>
-          <button type="button" onClick={onClose} className="px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-white/10" aria-label="Close">
-            ✕
-          </button>
-        </div>
-        {/* Camera preview (mock) */}
-        <div className="relative aspect-[3/4] bg-slate-900 grid place-items-center text-white">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.08),transparent_60%)]" />
-          <div className="rounded-xl border-2 border-white/60 w-3/4 h-1/2" />
-          <span className="absolute bottom-3 text-xs opacity-80">Camera preview (demo)</span>
-        </div>
-        <div className="p-4 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => setStatus("scanning")}
-            className="flex-1 rounded-xl border border-slate-200 px-4 py-2 font-semibold hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5"
-          >
-            Rescan
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setStatus("success");
-              setTimeout(() => {
-                alert("✅ Scanned! +125 BP at Sea Captain's House");
-                onClose();
-              }, 350);
-            }}
-            className="flex-1 rounded-xl bg-[#2EC4B6] text-white px-4 py-2 font-semibold hover:brightness-105"
-          >
-            {status === "success" ? "Success" : status === "scanning" ? "Scanning…" : "Scan"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- components/ui (reusable) ---------- */
 function NavItem({
   children,
   label,
@@ -610,9 +426,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function HeroCarousel({
   items,
   openQR,
+  children,
 }: {
   items: { title: string; sub: string }[];
   openQR: () => void;
+  children?: React.ReactNode; // slot (we use for theme toggle)
 }) {
   const [i, setI] = useState(0);
   useEffect(() => {
@@ -623,22 +441,27 @@ function HeroCarousel({
   return (
     <div className="relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-r from-[#FF6A5A] via-[#FF8E7A] to-[#2EC4B6] shadow-soft">
       <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/15 rounded-full blur-2xl" />
-      <h2 className="text-xl font-semibold">{cur.title}</h2>
-      <p className="text-white/90">{cur.sub}</p>
-      <div className="mt-4 flex gap-3">
-        <button
-          type="button"
-          onClick={openQR}
-          className="rounded-full bg-white/90 text-slate-800 text-sm px-4 py-2 font-semibold hover:bg-white"
-        >
-          Join Now
-        </button>
-        <a
-          href="#/map"
-          className="rounded-full border border-white/70 text-white text-sm px-4 py-2 font-semibold hover:bg-white/10"
-        >
-          See Map
-        </a>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">{cur.title}</h2>
+          <p className="text-white/90">{cur.sub}</p>
+          <div className="mt-4 flex gap-3">
+            <button
+              type="button"
+              onClick={openQR}
+              className="rounded-full bg-white/90 text-slate-800 text-sm px-4 py-2 font-semibold hover:bg-white"
+            >
+              Join Now
+            </button>
+            <a
+              href="#/map"
+              className="rounded-full border border-white/70 text-white text-sm px-4 py-2 font-semibold hover:bg-white/10"
+            >
+              See Map
+            </a>
+          </div>
+        </div>
+        {children}
       </div>
       {/* dots */}
       <div className="absolute bottom-3 right-4 flex gap-1.5">
@@ -740,7 +563,7 @@ function ImageScroll({ cards }: { cards: { img: string; title: string; meta?: st
   );
 }
 
-/* ---------- more reusable UI ---------- */
+/* ---------- Community UI ---------- */
 function HorizontalChips({ items }: { items: string[] }) {
   return (
     <div className="flex gap-2 overflow-auto no-scrollbar">
@@ -820,7 +643,7 @@ function PollCard({ question, options }: { question: string; options: string[] }
             className={`px-3 py-2 rounded-xl border text-left ${
               selected === o
                 ? "border-[#2EC4B6] bg-[#EAF9F7] dark:bg-[#163B36]"
-                : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/40 dark:hover:bg-white/5"
+                : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/40 dark:hover:bg:white/5"
             }`}
           >
             {o}
@@ -831,36 +654,189 @@ function PollCard({ question, options }: { question: string; options: string[] }
   );
 }
 
-function ReelCard({
-  user,
-  caption,
-  stats,
-  img,
-}: {
-  user: string;
-  caption: string;
-  stats: { waves: number; shells: number; suns: number; fires: number };
-  img: string;
-}) {
+/* ---------- Panels (Me tab) ---------- */
+function ProfilePanel() {
   return (
-    <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-soft bg-white dark:bg-slate-900/60 dark:border-white/10">
-      <div className="aspect-[3/4] bg-slate-100 relative">
-        <img src={img} alt="reel" className="absolute inset-0 w-full h-full object-cover" />
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard label="Points" value="1,250" hint="Total balance" />
+        <StatCard label="Vouchers" value="3" hint="Active" />
+        <StatCard label="Streak" value="5" hint="days" />
       </div>
-      <div className="p-3">
+      <div className="rounded-xl border border-slate-100 bg-white p-4 dark:bg-slate-900/60 dark:border-white/10">
+        <h5 className="font-semibold">Active Challenges</h5>
+        <ul className="mt-2 space-y-2 text-sm">
+          <li className="flex items-center justify-between">
+            <span>Visit 3 food vendors</span>
+            <span className="text-slate-500 dark:text-slate-400">2/3</span>
+          </li>
+          <li className="flex items-center justify-between">
+            <span>Attend 1 live event</span>
+            <span className="text-slate-500 dark:text-slate-400">0/1</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function WalletPanel() {
+  return (
+    <div className="space-y-4">
+      {/* Balance */}
+      <div className="rounded-xl border border-slate-100 bg-white p-4 dark:bg-slate-900/60 dark:border-white/10">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Avatar size={28} name={user.replace("@", "")} />
-            <div className="text-sm font-semibold">{user}</div>
-          </div>
-        <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
-            <span>🌊 {stats.waves}</span>
-            <span>🐚 {stats.shells}</span>
-            <span>☀️ {stats.suns}</span>
-            <span>🔥 {stats.fires}</span>
-          </div>
+          <h5 className="font-semibold">BeachPoints</h5>
+          <button type="button" className="px-3 py-1.5 rounded-full bg-[#2EC4B6] text-white text-sm font-semibold">
+            Transfer
+          </button>
         </div>
-        <p className="text-sm text-slate-600 mt-1 dark:text-slate-300">{caption}</p>
+        <div className="mt-3 text-3xl font-bold">1,250 BP</div>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Earned this month: 325 • Redeemed: 200</p>
+      </div>
+
+      {/* Vouchers */}
+      <div className="rounded-xl border border-slate-100 bg-white p-4 dark:bg-slate-900/60 dark:border-white/10">
+        <div className="flex items-center justify-between">
+          <h5 className="font-semibold">Vouchers</h5>
+          <button type="button" className="text-sm text-[#7C6FC5] font-semibold">
+            View all
+          </button>
+        </div>
+        <div className="mt-3 grid gap-3">
+          <VoucherCard brand="Surf Shack" offer="15% off" expires="Sep 30" />
+          <VoucherCard brand="Sea Captain's House" offer="$10 off $50" expires="Oct 15" />
+          <VoucherCard brand="SkyWheel" offer="2 for 1" expires="Oct 1" disabled />
+        </div>
+      </div>
+
+      {/* Ledger */}
+      <div className="rounded-xl border border-slate-100 bg-white p-4 dark:bg-slate-900/60 dark:border-white/10">
+        <h5 className="font-semibold">History</h5>
+        <ul className="mt-3 divide-y divide-slate-100 dark:divide-white/10">
+          <LedgerItem label="Check-in @ Surf Shack" delta={+150} date="Sep 10" />
+          <LedgerItem label="Redeemed: Pier fries" delta={-75} date="Sep 08" />
+          <LedgerItem label="Daily streak bonus" delta={+25} date="Sep 07" />
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function ActivityPanel() {
+  return (
+    <div className="space-y-3">
+      <ActivityRow title="Joined Surf Crew group" time="2h ago" icon={<CommunityIcon className="w-5 h-5" />} />
+      <ActivityRow title="Posted in Community" time="5h ago" icon={<ChatIcon className="w-5 h-5" />} />
+      <ActivityRow title="Uploaded a Reel" time="1d ago" icon={<ReelsIcon className="w-5 h-5" />} />
+      <ActivityRow title="Scanned @ Sea Captain's House" time="2d ago" icon={<ScanIcon className="w-5 h-5" />} />
+    </div>
+  );
+}
+
+/* ---------- Modal ---------- */
+function QrModal({ onClose }: { onClose: () => void }) {
+  const [status, setStatus] = useState<"idle" | "scanning" | "success">("idle");
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    const t = setTimeout(() => setStatus("scanning"), 300);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+      clearTimeout(t);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 backdrop-blur" role="dialog" aria-modal="true" aria-labelledby="qr-title">
+      <div className="w-[92vw] max-w-sm rounded-2xl overflow-hidden bg-white shadow-2xl border border-slate-200 dark:bg-slate-900 dark:border-white/10">
+        <div className="p-4 flex items-center justify-between border-b border-slate-100 dark:border-white/10">
+          <h3 id="qr-title" className="font-semibold">
+            Scan QR
+          </h3>
+          <button type="button" onClick={onClose} className="px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-white/10" aria-label="Close">
+            ✕
+          </button>
+        </div>
+        {/* Camera preview (mock) */}
+        <div className="relative aspect-[3/4] bg-slate-900 grid place-items-center text-white">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.08),transparent_60%)]" />
+          <div className="rounded-xl border-2 border-white/60 w-3/4 h-1/2" />
+          <span className="absolute bottom-3 text-xs opacity-80">Camera preview (demo)</span>
+        </div>
+        <div className="p-4 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setStatus("scanning")}
+            className="flex-1 rounded-xl border border-slate-200 px-4 py-2 font-semibold hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5"
+          >
+            Rescan
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStatus("success");
+              setTimeout(() => {
+                alert("✅ Scanned! +125 BP at Sea Captain's House");
+                onClose();
+              }, 350);
+            }}
+            className="flex-1 rounded-xl bg-[#2EC4B6] text-white px-4 py-2 font-semibold hover:brightness-105"
+          >
+            {status === "success" ? "Success" : status === "scanning" ? "Scanning…" : "Scan"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Small UI Bits ---------- */
+function SubTab({ label, active, onClick }: { label: string; active?: boolean; onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+        active ? "bg-[#F6F0FF] text-[#7C6FC5]" : "bg-transparent text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function Avatar({ name, size = 40 }: { name: string; size?: number }) {
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  return (
+    <div
+      className="grid place-items-center rounded-full bg-gradient-to-br from-[#FF6A5A] to-[#7C6FC5] text-white font-bold shadow-soft"
+      style={{ width: size, height: size }}
+      aria-label={`${name} avatar`}
+    >
+      <span className="text-sm">{initials}</span>
+    </div>
+  );
+}
+
+function ActivityRow({ title, time, icon }: { title: string; time: string; icon: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 dark:bg-slate-900/60 dark:border-white/10">
+      <div className="grid place-items-center w-9 h-9 rounded-full bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-200">
+        {icon}
+      </div>
+      <div>
+        <div className="text-sm font-medium">{title}</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400">{time}</div>
       </div>
     </div>
   );
@@ -909,96 +885,7 @@ function LedgerItem({ label, delta, date }: { label: string; delta: number; date
   );
 }
 
-function RoleCard({ title, desc }: { title: string; desc: string }) {
-  return (
-    <button
-      type="button"
-      className="rounded-xl border border-slate-100 bg-white p-4 text-left hover:shadow-md transition dark:bg-slate-900/60 dark:border-white/10"
-    >
-      <div className="font-semibold">{title}</div>
-      <div className="text-sm text-slate-600 dark:text-slate-300">{desc}</div>
-    </button>
-  );
-}
-
-function ActivityRow({ title, time, icon }: { title: string; time: string; icon: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 dark:bg-slate-900/60 dark:border-white/10">
-      <div className="grid place-items-center w-9 h-9 rounded-full bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-200">
-        {icon}
-      </div>
-      <div>
-        <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs text-slate-500 dark:text-slate-400">{time}</div>
-      </div>
-    </div>
-  );
-}
-
-function SubTab({ label, active, onClick }: { label: string; active?: boolean; onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-        active ? "bg-[#F6F0FF] text-[#7C6FC5]" : "bg-transparent text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function Avatar({ name, size = 40 }: { name: string; size?: number }) {
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-  return (
-    <div
-      className="grid place-items-center rounded-full bg-gradient-to-br from-[#FF6A5A] to-[#7C6FC5] text-white font-bold shadow-soft"
-      style={{ width: size, height: size }}
-      aria-label={`${name} avatar`}
-    >
-      <span className="text-sm">{initials}</span>
-    </div>
-  );
-}
-
-/* ---------- icons ---------- */
-function Logo() {
-  return (
-    <a href="#/now" className="flex items-center gap-2">
-      <span className="inline-grid place-items-center w-7 h-7 rounded-lg bg-gradient-to-br from-[#FF6A5A] to-[#2EC4B6] text-white shadow">
-        🌊
-      </span>
-      <span className="font-semibold">BeachLife</span>
-    </a>
-  );
-}
-
-function BellIcon({ className = "w-6 h-6" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={className}>
-      <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 0 0-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5" />
-      <path d="M9.5 17a2.5 2.5 0 0 0 5 0" />
-    </svg>
-  );
-}
-function ThemeIcon({ className = "w-6 h-6", dark }: { className?: string; dark?: boolean }) {
-  return dark ? (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <circle cx="12" cy="12" r="5" />
-      <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-    </svg>
-  );
-}
+/* ---------- Icons ---------- */
 function FlameIcon({ className = "w-6 h-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -1050,6 +937,18 @@ function ChatIcon({ className = "w-6 h-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={className}>
       <path d="M21 12a8 8 0 1 1-4-6.9L21 5l-1.9 2.9A7.9 7.9 0 0 1 21 12z" />
+    </svg>
+  );
+}
+function ThemeIcon({ className = "w-6 h-6", dark }: { className?: string; dark?: boolean }) {
+  return dark ? (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <circle cx="12" cy="12" r="5" />
+      <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
     </svg>
   );
 }
