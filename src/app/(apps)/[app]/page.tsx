@@ -1,12 +1,13 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import React, { useEffect, useMemo, useState } from "react";
 
 /**
  * BeachLife 5-Tab App UI Mockup (React + Tailwind)
- * Variant: No header, no floating Scan button
- * Includes: “Happening Now” spec, QR modal, hash-router, dark mode toggle (in hero CTA remains)
- * Drop into app/page.tsx. Tailwind required (darkMode: 'class').
+ * v4: Header removed, Floating Scan removed, all helper components included.
+ * Drop into: src/app/(apps)/[app]/page.tsx
+ * Tailwind: ensure darkMode: 'class'. See CSS notes at bottom for .no-scrollbar and .shadow-soft
  */
 
 /* =================== Router Scaffold =================== */
@@ -50,7 +51,8 @@ export default function BeachLifeAppMock() {
   const points = 375;
   const nextMilestone = 500;
   const pct = Math.min(100, Math.round((points / nextMilestone) * 100));
-  const size = 120, stroke = 12;
+  const size = 120,
+    stroke = 12;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const dash = useMemo(() => (pct / 100) * c, [pct, c]);
@@ -126,23 +128,19 @@ function NowTab({
   ];
   return (
     <div className="space-y-4">
-      {/* Hero with internal actions (theme + Join/Map) */}
       <HeroCarousel items={items} openQR={openQR}>
-        <div className="flex items-center gap-2">
-          {/* Small theme toggle since header is gone */}
-          <button
-            type="button"
-            onClick={() => setDark(!dark)}
-            className="p-2 rounded-full bg-white/90 text-slate-800 hover:bg-white"
-            aria-label="Toggle theme"
-            title="Toggle theme"
-          >
-            <ThemeIcon className="w-5 h-5" dark={dark} />
-          </button>
-        </div>
+        {/* Tiny theme toggle lives in hero since header is gone */}
+        <button
+          type="button"
+          onClick={() => setDark(!dark)}
+          className="p-2 rounded-full bg-white/90 text-slate-800 hover:bg-white"
+          aria-label="Toggle theme"
+          title="Toggle theme"
+        >
+          <ThemeIcon className="w-5 h-5" dark={dark} />
+        </button>
       </HeroCarousel>
 
-      {/* Live Activity Cards */}
       <Section title="Live Nearby">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <LiveCard
@@ -164,7 +162,6 @@ function NowTab({
         </div>
       </Section>
 
-      {/* Trending Vendors / Events */}
       <Section title="Trending Vendors & Events">
         <ImageScroll
           cards={[
@@ -430,7 +427,7 @@ function HeroCarousel({
 }: {
   items: { title: string; sub: string }[];
   openQR: () => void;
-  children?: React.ReactNode; // slot (we use for theme toggle)
+  children?: React.ReactNode; // slot (theme toggle lives here)
 }) {
   const [i, setI] = useState(0);
   useEffect(() => {
@@ -643,12 +640,48 @@ function PollCard({ question, options }: { question: string; options: string[] }
             className={`px-3 py-2 rounded-xl border text-left ${
               selected === o
                 ? "border-[#2EC4B6] bg-[#EAF9F7] dark:bg-[#163B36]"
-                : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/40 dark:hover:bg:white/5"
+                : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/40 dark:hover:bg-white/5"
             }`}
           >
             {o}
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Reels UI ---------- */
+function ReelCard({
+  user,
+  caption,
+  stats,
+  img,
+}: {
+  user: string;
+  caption: string;
+  stats: { waves: number; shells: number; suns: number; fires: number };
+  img: string;
+}) {
+  return (
+    <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-soft bg-white dark:bg-slate-900/60 dark:border-white/10">
+      <div className="aspect-[3/4] bg-slate-100 relative">
+        <img src={img} alt="reel" className="absolute inset-0 w-full h-full object-cover" />
+      </div>
+      <div className="p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Avatar size={28} name={user.replace("@", "")} />
+            <div className="text-sm font-semibold">{user}</div>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+            <span>🌊 {stats.waves}</span>
+            <span>🐚 {stats.shells}</span>
+            <span>☀️ {stats.suns}</span>
+            <span>🔥 {stats.fires}</span>
+          </div>
+        </div>
+        <p className="text-sm text-slate-600 mt-1 dark:text-slate-300">{caption}</p>
       </div>
     </div>
   );
@@ -752,7 +785,12 @@ function QrModal({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 backdrop-blur" role="dialog" aria-modal="true" aria-labelledby="qr-title">
+    <div
+      className="fixed inset-0 z-[60] grid place-items-center bg-black/50 backdrop-blur"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="qr-title"
+    >
       <div className="w-[92vw] max-w-sm rounded-2xl overflow-hidden bg-white shadow-2xl border border-slate-200 dark:bg-slate-900 dark:border-white/10">
         <div className="p-4 flex items-center justify-between border-b border-slate-100 dark:border-white/10">
           <h3 id="qr-title" className="font-semibold">
@@ -882,6 +920,18 @@ function LedgerItem({ label, delta, date }: { label: string; delta: number; date
       </div>
       <div className={`${plus ? "text-emerald-600" : "text-rose-500"} font-semibold`}>{plus ? "+" : ""}{delta} BP</div>
     </li>
+  );
+}
+
+function RoleCard({ title, desc }: { title: string; desc: string }) {
+  return (
+    <button
+      type="button"
+      className="rounded-xl border border-slate-100 bg-white p-4 text-left hover:shadow-md transition dark:bg-slate-900/60 dark:border-white/10"
+    >
+      <div className="font-semibold">{title}</div>
+      <div className="text-sm text-slate-600 dark:text-slate-300">{desc}</div>
+    </button>
   );
 }
 
