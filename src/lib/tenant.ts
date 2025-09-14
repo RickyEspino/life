@@ -1,8 +1,8 @@
-// src/lib/tenant.ts
 import { headers } from "next/headers";
 
-export function getTenantSlug(): string {
-  return headers().get("x-tenant") ?? "beach";
+export async function getTenantSlug(): Promise<string> {
+  const h = await headers();                      // 👈 await it
+  return h.get("x-tenant") ?? "beach";
 }
 
 export function getTenantMeta(slug: string) {
@@ -13,7 +13,6 @@ export function getTenantMeta(slug: string) {
   }
 }
 
-// Return CSS custom properties as an object
 export function getTenantTheme(slug: string): Record<`--${string}`, string> {
   const themes: Record<string, Record<`--${string}`, string>> = {
     beach: { "--brand": "#2EC4B6", "--accent": "#FF6A5A" },

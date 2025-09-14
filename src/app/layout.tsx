@@ -1,11 +1,10 @@
-// src/app/layout.tsx
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
 import { getTenantSlug, getTenantMeta, getTenantTheme } from "@/lib/tenant";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const h = headers();
+  const h = await headers(); // 👈 await it
   const host = h.get("host") ?? "beach.localhost:3000";
   const tenant = h.get("x-tenant") ?? "beach";
   const meta = getTenantMeta(tenant);
@@ -20,8 +19,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 type CSSVars = React.CSSProperties & Record<`--${string}`, string>;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const tenant = getTenantSlug();
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const tenant = await getTenantSlug();           // 👈 now async
   const themeVars = getTenantTheme(tenant) as CSSVars;
 
   return (
