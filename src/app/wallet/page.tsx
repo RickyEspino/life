@@ -5,16 +5,32 @@ import { getTenantSlug } from "@/lib/tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type Wallet = { id: string };
-type Tenant = { id: string; name: string; slug: string };
+
+// unified total balance row
+type TotalBalanceRow = { balance: number };
+
+// per-tenant breakdown row (joined)
+type BreakdownRow = {
+  tenant_id: string;
+  balance: number;
+  tenants: { name: string; slug: string };
+};
+
+// recent ledger row (joined)
+type TxnRow = {
+  created_at: string;
+  event_type: string;
+  delta: number;
+  reason: string | null;
+  tenants: { name: string; slug: string } | null;
+};
 
 export default async function WalletPage() {
-  const tenantSlug = await getTenantSlug();         // branding only
+  const tenantSlug = await getTenantSlug(); // branding only
   const admin = createAdminClient();
 
-  // demo wallet (no auth)
+  // demo wallet (no auth for now)
   const demoUserId = process.env.DEMO_USER_ID!;
-
-  // (1) get wallet id
   const { data: wallet, error: wErr } = await admin
     .from("wallets")
     .select("id")
@@ -23,33 +39,36 @@ export default async function WalletPage() {
   if (wErr) return <main className="p-6 text-red-600">Wallet lookup error: {wErr.message}</main>;
   if (!wallet) return <main className="p-6">No wallet found for demo user {demoUserId}.</main>;
 
-  // (2) unified balance (no tenant filter)
+  // unified balance (no tenant filter)
   const { data: totalRow, error: bErr } = await admin
     .from("wallet_balance_total")
     .select("balance")
     .eq("wallet_id", wallet.id)
-    .maybeSingle<{ balance: number }>();
+    .maybeSingle<TotalBalanceRow>();
   if (bErr) return <main className="p-6 text-red-600">Balance error: {bErr.message}</main>;
   const total = totalRow?.balance ?? 0;
 
-  // (3) optional: breakdown by tenant (purely informational)
+  // breakdown per tenant (informational)
   const { data: breakdownRows, error: brErr } = await admin
     .from("wallet_balance_by_tenant")
     .select("tenant_id, balance, tenants!inner(name,slug)")
-    .eq("wallet_id", wallet.id);
+    .eq("wallet_id", wallet.id)
+    .returns<BreakdownRow[]>();
   if (brErr) return <main className="p-6 text-red-600">Breakdown error: {brErr.message}</main>;
+
   const breakdown =
     (breakdownRows ?? [])
-      .map((r: any) => ({ slug: r.tenants.slug as string, name: r.tenants.name as string, balance: r.balance as number }))
+      .map((r) => ({ slug: r.tenants.slug, name: r.tenants.name, balance: r.balance }))
       .sort((a, b) => a.slug.localeCompare(b.slug));
 
-  // (4) recent activity (across all tenants)
+  // recent activity across all tenants
   const { data: txns, error: lErr } = await admin
     .from("points_ledger")
     .select("created_at, event_type, delta, reason, tenants(name,slug)")
     .eq("wallet_id", wallet.id)
     .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(10)
+    .returns<TxnRow[]>();
   if (lErr) return <main className="p-6 text-red-600">Ledger error: {lErr.message}</main>;
 
   return (
@@ -81,16 +100,14 @@ export default async function WalletPage() {
       <h2 className="mt-8 text-lg font-semibold">Recent activity (all lifestyles)</h2>
       <ul className="mt-3 divide-y rounded-xl border bg-white">
         {(txns ?? []).length ? (
-          (txns ?? []).map((r: any, i: number) => (
+          (txns ?? []).map((r, i) => (
             <li key={i} className="p-3 flex items-center justify-between">
               <div>
                 <div className="text-sm capitalize">
                   {r.event_type.replace("_", " ")} — {r.tenants?.name ?? "Unknown"}
                 </div>
                 {r.reason && <div className="text-xs text-slate-500">{r.reason}</div>}
-                <div className="text-xs text-slate-400">
-                  {new Date(r.created_at as string).toLocaleString()}
-                </div>
+                <div className="text-xs text-slate-400">{new Date(r.created_at).toLocaleString()}</div>
               </div>
               <div className={`text-base font-semibold ${r.delta >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {r.delta > 0 ? `+${r.delta}` : r.delta}
