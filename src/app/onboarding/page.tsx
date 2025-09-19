@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { createClient } from "@supabase/supabase-js";
+import { redirect } from "next/navigation";
 
 function admin() {
   return createClient(
@@ -16,26 +17,23 @@ type Tenant = { id: string; slug: string; name: string };
 
 export default async function OnboardingPage() {
   const supa = admin();
-  // In v1, you’re still using DEMO_USER_ID; when you switch to real auth,
-  // replace this with the logged-in user id from Supabase JWT/cookies.
-  const userId = process.env.DEMO_USER_ID!;
+  const userId = process.env.DEMO_USER_ID!; // replace with real auth when ready
 
   const { data: tenants } = await supa
     .from("tenants")
     .select("id, slug, name")
-    .order("slug");
+    .order("slug")
+    .returns<Tenant[]>();
 
   async function setPrimaryTenant(formData: FormData) {
     "use server";
     const supa = admin();
     const tenantId = String(formData.get("tenant_id") || "");
 
-    // upsert profile
     await supa
       .from("user_profiles")
       .upsert({ user_id: userId, primary_tenant_id: tenantId }, { onConflict: "user_id" });
 
-    // fetch slug and redirect to that tenant’s subdomain
     const { data: t } = await supa
       .from("tenants")
       .select("slug")
@@ -43,14 +41,15 @@ export default async function OnboardingPage() {
       .maybeSingle<{ slug: string }>();
 
     const slug = t?.slug || "beach";
-    // Redirect to tenant app (server action redirect)
-    return { redirect: `https://${slug}.beachlifeapp.com/wallet` };
+    redirect(`https://${slug}.beachlifeapp.com/wallet`);
   }
 
   return (
     <main className="mx-auto max-w-2xl p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Choose your primary lifestyle</h1>
-      <p className="text-slate-600">You can earn and spend in any lifestyle—this just sets your default home.</p>
+      <p className="text-slate-600">
+        You can earn and spend in any lifestyle—this just sets your default home.
+      </p>
 
       <form action={setPrimaryTenant} className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {(tenants ?? []).map((t) => (
