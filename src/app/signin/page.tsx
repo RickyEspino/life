@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/browser";
 import Link from "next/link";
 
@@ -9,6 +9,12 @@ export default function SignInPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  const AUTH_BASE = useMemo(() => {
+    const v = process.env.NEXT_PUBLIC_AUTH_BASE;
+    if (!v) console.warn("NEXT_PUBLIC_AUTH_BASE is not set");
+    return (v || window.location.origin).replace(/\/$/, "");
+  }, []);
 
   async function handleMagicLink(e: React.FormEvent) {
     e.preventDefault();
@@ -22,24 +28,25 @@ export default function SignInPage() {
       const params = new URLSearchParams(window.location.search);
       const next = params.get("next") || "/wallet";
 
-      // Always send users to our callback (it completes the session)
-      const redirectTo = new URL(
-        `/auth/callback?next=${encodeURIComponent(next)}`,
-        window.location.origin
-      ).toString();
+      // Always send to the single allowed callback host
+      const redirectTo = `${AUTH_BASE}/auth/callback?next=${encodeURIComponent(next)}`;
 
       const { error } = await supa.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: redirectTo,
-          shouldCreateUser: true, // helpful when first-time users sign in
+          shouldCreateUser: true,
         },
       });
 
-      if (error) setErr(error.message);
-      else setMsg("Check your email for a sign-in link. It expires shortly.");
+      if (error) {
+        console.error("signInWithOtp error:", error);
+        setErr(error.message);             // <- show exact cause
+      } else {
+        setMsg("Check your email for a sign-in link. It expires shortly.");
+      }
     } catch (e: unknown) {
-      console.error("signInWithOtp failed", e);
+      console.error("signInWithOtp threw:", e);
       setErr("Something went wrong. Please try again.");
     } finally {
       setBusy(false);
@@ -78,9 +85,22 @@ export default function SignInPage() {
       </form>
 
       {msg && <p className="mt-4 text-sm text-green-700">{msg}</p>}
-      {err && <p className="mt-4 text-sm text-red-600">{err}</p>}
+      {err && (
+        <p className="mt-4 text-sm text-red-600">
+          {err}
+          <br />
+          <span className="text-xs text-slate-500">
+            If this says the redirect is not allowed, add{" "}
+            <code>{AUTH_BASE}/auth/callback*</code> to Supabase → Auth → Redirect URLs.
+          </span>
+        </p>
+      )}
 
-      <p className="mt-8 text-sm text-slate-500">
+      <p className="mt-8 text-xs text-slate-500">
+        Debug: AUTH_BASE = <code>{AUTH_BASE || "(not set)"}</code>
+      </p>
+
+      <p className="mt-4 text-sm text-slate-500">
         By continuing you agree to our{" "}
         <Link href="/terms" className="underline">Terms</Link> and{" "}
         <Link href="/privacy" className="underline">Privacy Policy</Link>.

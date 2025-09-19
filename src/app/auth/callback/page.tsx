@@ -14,12 +14,13 @@ export default function AuthCallbackPage() {
 
     async function run() {
       try {
-        // Accept either code in query (?code=...) or tokens in hash (#access_token=...)
-        const { error } = await supa.auth.exchangeCodeForSession(window.location.href);
+        const { error } = await supa.auth.exchangeCodeForSession(
+          window.location.href
+        );
+
         if (error) {
           console.error("Auth callback error:", error);
           setStatus("Sign-in failed: " + error.message);
-          // bounce back to /signin after a moment
           setTimeout(() => router.replace("/signin"), 1800);
           return;
         }

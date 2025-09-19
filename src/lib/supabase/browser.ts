@@ -1,11 +1,8 @@
-// src/lib/supabase/browser.ts
 "use client";
 
 import { createClient } from "@supabase/supabase-js";
 
-let singleton:
-  | ReturnType<typeof createClient>
-  | null = null;
+let singleton: ReturnType<typeof createClient> | null = null;
 
 export function getSupabaseBrowser() {
   if (singleton) return singleton;
@@ -13,16 +10,17 @@ export function getSupabaseBrowser() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   if (!url || !anon) {
-    throw new Error("Supabase env vars missing in browser (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY).");
+    throw new Error(
+      "Supabase env vars missing (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY)."
+    );
   }
 
   singleton = createClient(url, anon, {
     auth: {
-      persistSession: true,           // keep the session in localStorage
+      persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,       // allows handling hash/callbacks
+      detectSessionInUrl: true,
     },
   });
-
   return singleton;
 }
