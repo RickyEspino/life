@@ -22,7 +22,7 @@ export default function SignInPage() {
       const params = new URLSearchParams(window.location.search);
       const next = params.get("next") || "/wallet";
 
-      // Always go through /auth/callback so session is stored
+      // Always send users to our callback (it completes the session)
       const redirectTo = new URL(
         `/auth/callback?next=${encodeURIComponent(next)}`,
         window.location.origin
@@ -30,13 +30,16 @@ export default function SignInPage() {
 
       const { error } = await supa.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: redirectTo },
+        options: {
+          emailRedirectTo: redirectTo,
+          shouldCreateUser: true, // helpful when first-time users sign in
+        },
       });
 
       if (error) setErr(error.message);
       else setMsg("Check your email for a sign-in link. It expires shortly.");
-    } catch (err) {
-      console.error(err);
+    } catch (e: unknown) {
+      console.error("signInWithOtp failed", e);
       setErr("Something went wrong. Please try again.");
     } finally {
       setBusy(false);
