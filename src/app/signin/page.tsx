@@ -22,7 +22,7 @@ export default function SignInPage() {
       const params = new URLSearchParams(window.location.search);
       const next = params.get("next") || "/wallet";
 
-      // IMPORTANT: send the user to our callback page so the session is established
+      // Always go through /auth/callback so session is stored
       const redirectTo = new URL(
         `/auth/callback?next=${encodeURIComponent(next)}`,
         window.location.origin
@@ -35,7 +35,8 @@ export default function SignInPage() {
 
       if (error) setErr(error.message);
       else setMsg("Check your email for a sign-in link. It expires shortly.");
-    } catch {
+    } catch (err) {
+      console.error(err);
       setErr("Something went wrong. Please try again.");
     } finally {
       setBusy(false);

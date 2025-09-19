@@ -1,40 +1,34 @@
-// src/app/auth/callback/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase/browser";
 
 export default function AuthCallbackPage() {
-  const [msg, setMsg] = useState("Completing sign-in…");
+  const router = useRouter();
+  const params = useSearchParams();
 
   useEffect(() => {
+    const supa = getSupabaseBrowser();
+
     async function run() {
-      try {
-        const supa = getSupabaseBrowser();
+      const next = params.get("next") || "/wallet";
+      const { data, error } = await supa.auth.exchangeCodeForSession(window.location.href);
 
-        // Supabase sends either a code (?code=...) or a hash (#access_token=...)
-        // exchangeCodeForSession() handles both.
-        const { error } = await supa.auth.exchangeCodeForSession(window.location.href);
-        if (error) {
-          setMsg("Sign-in failed. " + error.message);
-          return;
-        }
-
-        // honor ?next=... if present, else /wallet
-        const url = new URL(window.location.href);
-        const next = url.searchParams.get("next") || "/wallet";
-        window.location.replace(next);
-      } catch (e) {
-        setMsg("Something went wrong finishing the sign-in.");
+      if (error) {
+        console.error("Auth error:", error);
+        router.replace("/signin?error=" + encodeURIComponent(error.message));
+      } else {
+        router.replace(next);
       }
     }
+
     run();
-  }, []);
+  }, [params, router]);
 
   return (
-    <main className="mx-auto max-w-md p-8 text-center">
-      <h1 className="text-2xl font-semibold">Just a sec…</h1>
-      <p className="mt-2 text-slate-600">{msg}</p>
+    <main className="flex h-screen items-center justify-center">
+      <p className="text-slate-600">Finishing sign-in…</p>
     </main>
   );
 }
