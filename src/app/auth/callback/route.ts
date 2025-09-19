@@ -1,40 +1,45 @@
+// src/app/auth/callback/route.ts
 import { NextResponse } from "next/server";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { getSupabaseServer } from "@/lib/supabase/server"; // uses async cookies in Next 15
 
 function toAbs(url: URL, next: string) {
-  // Accept absolute or relative next; normalize to absolute URL
   try {
     return new URL(next, url.origin).toString();
   } catch {
-    return url.origin; // very unlikely, but safe fallback
+    return url.origin;
   }
 }
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const supabase = createRouteHandlerClient({ cookies });
+  const supabase = getSupabaseServer();
 
-  // 1) Exchange the code+state for a Supabase session cookie on this domain
-  await supabase.auth.exchangeCodeForSession(url);
+  // 1) Exchange the ?code=... for a session cookie on this domain
+  const code = url.searchParams.get("code");
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      return NextResponse.redirect(new URL(`/signin?error=${encodeURIComponent(error.message)}`, url.origin));
+    }
+  } else {
+    // no code? send to signin
+    return NextResponse.redirect(new URL("/signin?error=missing_code", url.origin));
+  }
 
-  // If an explicit `next` was provided, always respect it
+  // 2) Honor explicit ?next=
   const next = url.searchParams.get("next");
   if (next) {
     return NextResponse.redirect(toAbs(url, next));
   }
 
-  // 2) Otherwise try to route returning users straight to their lifestyle
+  // 3) Otherwise, if user has a primary tenant, jump to its subdomain dashboard
   const { data: userRes } = await supabase.auth.getUser();
   const user = userRes?.user;
 
-  // Root domain for subdomain redirects (no protocol). Defaults to beachlifeapp.com.
   const ROOT =
     (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "beachlifeapp.com").replace(/^https?:\/\//, "");
 
   if (user) {
-    // Read their chosen lifestyle (primary tenant)
-    // RLS must allow: SELECT user_profiles where user_id=auth.uid()
     const { data: profile } = await supabase
       .from("user_profiles")
       .select("primary_tenant_id")
@@ -42,7 +47,6 @@ export async function GET(req: Request) {
       .maybeSingle<{ primary_tenant_id: string | null }>();
 
     if (profile?.primary_tenant_id) {
-      // Look up the tenant slug
       const { data: tenant } = await supabase
         .from("tenants")
         .select("slug")
@@ -50,13 +54,11 @@ export async function GET(req: Request) {
         .maybeSingle<{ slug: string }>();
 
       if (tenant?.slug) {
-        // Send straight to the user dashboard on the correct subdomain
-        const dest = `https://${tenant.slug}.${ROOT}/wallet`;
-        return NextResponse.redirect(dest);
+        return NextResponse.redirect(`https://${tenant.slug}.${ROOT}/wallet`);
       }
     }
   }
 
-  // 3) New users (or no profile yet) go to onboarding
+  // 4) New users (or no profile yet) → onboarding
   return NextResponse.redirect(new URL("/onboarding", url.origin));
 }
