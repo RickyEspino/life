@@ -26,7 +26,7 @@ export default function SignInPage() {
       const supa = getSupabaseBrowser();
 
       const params = new URLSearchParams(window.location.search);
-      // ⬇️ default to onboarding, not wallet
+      // default to onboarding (we’ll skip it for returning users in the callback)
       const next = params.get("next") || "/onboarding";
 
       const redirectTo = `${AUTH_BASE}/auth/callback?next=${encodeURIComponent(next)}`;
@@ -39,9 +39,13 @@ export default function SignInPage() {
         },
       });
 
-      if (error) setErr(error.message);
-      else setMsg("Check your email for a sign-in link. It expires shortly.");
-    } catch (e) {
+      if (error) {
+        console.error("signInWithOtp error:", error);
+        setErr(error.message);
+      } else {
+        setMsg("Check your email for a sign-in link. It expires shortly.");
+      }
+    } catch {
       setErr("Something went wrong. Please try again.");
     } finally {
       setBusy(false);
@@ -51,7 +55,9 @@ export default function SignInPage() {
   return (
     <main className="mx-auto max-w-md p-6">
       <h1 className="text-2xl font-semibold">Sign in</h1>
-      <p className="mt-2 text-slate-600">Use your email to receive a secure, one-time sign-in link.</p>
+      <p className="mt-2 text-slate-600">
+        Use your email to receive a secure, one-time sign-in link.
+      </p>
 
       <form onSubmit={handleMagicLink} className="mt-6 space-y-4">
         <label className="block">
