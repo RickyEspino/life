@@ -1,23 +1,16 @@
-// src/app/auth/callback/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase/server";
+import { NextResponse } from "next/server";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   const url = new URL(req.url);
-  const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") || "/wallet";
+  const next = url.searchParams.get("next") || "/onboarding";
 
-  if (!code) {
-    const to = new URL(`/signin?error=missing_code`, url.origin);
-    return NextResponse.redirect(to);
-  }
+  const supabase = createRouteHandlerClient({ cookies });
 
-  const supabase = getSupabaseServer();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error) {
-    const to = new URL(`/signin?error=${encodeURIComponent(error.message)}`, url.origin);
-    return NextResponse.redirect(to);
-  }
+  // This exchanges the code in the URL and sets Supabase session cookies
+  await supabase.auth.exchangeCodeForSession(url);
 
+  // After session, go to the intended page (defaults to onboarding)
   return NextResponse.redirect(new URL(next, url.origin));
 }

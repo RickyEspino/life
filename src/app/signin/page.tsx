@@ -26,9 +26,9 @@ export default function SignInPage() {
       const supa = getSupabaseBrowser();
 
       const params = new URLSearchParams(window.location.search);
-      const next = params.get("next") || "/wallet";
+      // ⬇️ default to onboarding, not wallet
+      const next = params.get("next") || "/onboarding";
 
-      // Always send to the single allowed callback host
       const redirectTo = `${AUTH_BASE}/auth/callback?next=${encodeURIComponent(next)}`;
 
       const { error } = await supa.auth.signInWithOtp({
@@ -39,14 +39,9 @@ export default function SignInPage() {
         },
       });
 
-      if (error) {
-        console.error("signInWithOtp error:", error);
-        setErr(error.message);             // <- show exact cause
-      } else {
-        setMsg("Check your email for a sign-in link. It expires shortly.");
-      }
-    } catch (e: unknown) {
-      console.error("signInWithOtp threw:", e);
+      if (error) setErr(error.message);
+      else setMsg("Check your email for a sign-in link. It expires shortly.");
+    } catch (e) {
       setErr("Something went wrong. Please try again.");
     } finally {
       setBusy(false);
@@ -56,9 +51,7 @@ export default function SignInPage() {
   return (
     <main className="mx-auto max-w-md p-6">
       <h1 className="text-2xl font-semibold">Sign in</h1>
-      <p className="mt-2 text-slate-600">
-        Use your email to receive a secure, one-time sign-in link.
-      </p>
+      <p className="mt-2 text-slate-600">Use your email to receive a secure, one-time sign-in link.</p>
 
       <form onSubmit={handleMagicLink} className="mt-6 space-y-4">
         <label className="block">
@@ -85,24 +78,10 @@ export default function SignInPage() {
       </form>
 
       {msg && <p className="mt-4 text-sm text-green-700">{msg}</p>}
-      {err && (
-        <p className="mt-4 text-sm text-red-600">
-          {err}
-          <br />
-          <span className="text-xs text-slate-500">
-            If this says the redirect is not allowed, add{" "}
-            <code>{AUTH_BASE}/auth/callback*</code> to Supabase → Auth → Redirect URLs.
-          </span>
-        </p>
-      )}
+      {err && <p className="mt-4 text-sm text-red-600">{err}</p>}
 
-      <p className="mt-8 text-xs text-slate-500">
-        Debug: AUTH_BASE = <code>{AUTH_BASE || "(not set)"}</code>
-      </p>
-
-      <p className="mt-4 text-sm text-slate-500">
-        By continuing you agree to our{" "}
-        <Link href="/terms" className="underline">Terms</Link> and{" "}
+      <p className="mt-8 text-sm text-slate-500">
+        By continuing you agree to our <Link href="/terms" className="underline">Terms</Link> and{" "}
         <Link href="/privacy" className="underline">Privacy Policy</Link>.
       </p>
     </main>
