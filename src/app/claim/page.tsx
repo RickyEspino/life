@@ -1,3 +1,4 @@
+// src/app/claim/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -9,6 +10,27 @@ export default function ClaimPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
+
+    function confetti(n = 120) {
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < n; i++) {
+        const el = document.createElement("div");
+        el.textContent = "🎉";
+        el.style.position = "fixed";
+        el.style.left = Math.random() * 100 + "vw";
+        el.style.top = "-2rem";
+        el.style.fontSize = 12 + Math.random() * 24 + "px";
+        el.style.transition = "transform 1.2s ease-out, opacity 1.2s";
+        frag.appendChild(el);
+        // async start to allow transition
+        requestAnimationFrame(() => {
+          el.style.transform = `translateY(${100 + Math.random() * 60}vh) rotate(${Math.random() * 720 - 360}deg)`;
+          el.style.opacity = "0";
+        });
+        setTimeout(() => el.remove(), 1400);
+      }
+      document.body.appendChild(frag);
+    }
 
     async function redeem() {
       if (!code) {
@@ -30,16 +52,11 @@ export default function ClaimPage() {
         }
         setState("ok");
         setMsg(`+${j.points} points${j.merchantName ? ` from ${j.merchantName}` : ""}!`);
-
-        // Simple confetti without deps
-        // @ts-ignore
-        const C = (n=80)=>{for(let i=0;i<n;i++){const s=document.createElement('div');s.textContent='🎉';s.style.position='fixed';s.style.left=Math.random()*100+'vw';s.style.top='-2rem';s.style.fontSize=(12+Math.random()*24)+'px';s.style.transition='transform 1.2s ease-out, opacity 1.2s';document.body.appendChild(s);requestAnimationFrame(()=>{s.style.transform=`translateY(${100+Math.random()*60}vh) rotate(${Math.random()*720-360}deg)`;s.style.opacity='0';});setTimeout(()=>s.remove(),1400);}};
-
-        C(120);
-
-        // After a moment, send them to wallet
-        setTimeout(() => (window.location.href = "/wallet"), 1800);
-      } catch (e) {
+        confetti(140);
+        setTimeout(() => {
+          window.location.href = "/wallet";
+        }, 1800);
+      } catch {
         setState("err");
         setMsg("Network error.");
       }
