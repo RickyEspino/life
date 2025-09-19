@@ -4,14 +4,28 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// server-only admin client
+// server-only admin client (service role)
 function admin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  if (!url || !key) throw new Error("Supabase env is missing");
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
 type Payload = { code: string };
+
+type TokenRow = {
+  code: string;
+  points: number;
+  expires_at: string;
+  claimed_at: string | null;
+  merchant_id: string | null;
+};
+
+type MerchantRow = {
+  name: string;
+  tenant_id: string | null;
+};
 
 export async function POST(req: Request) {
   const { code } = (await req.json()) as Payload;
@@ -28,18 +42,12 @@ export async function POST(req: Request) {
 
   const supa = admin();
 
-  // 1) Fetch token
+  // 1) Fetch token (points + merchant_id)
   const { data: token, error: tErr } = await supa
     .from("earn_tokens")
     .select("code, points, expires_at, claimed_at, merchant_id")
     .eq("code", code)
-    .maybeSingle<{
-      code: string;
-      points: number;
-      expires_at: string;
-      claimed_at: string | null;
-      merchant_id: string | null;
-    }>();
+    .maybeSingle<TokenRow>();
 
   if (tErr || !token) {
     return NextResponse.json({ error: "Invalid or unknown code." }, { status: 404 });
@@ -71,26 +79,31 @@ export async function POST(req: Request) {
     walletId = w2.id;
   }
 
-  // Optional: pull merchant + tenant to attribute in ledger
-  let tenantId: string | null = null;
+  // 3) Resolve merchant + tenant (optional if merchant_id is null)
   let merchantName: string | null = null;
+  let tenantId: string | null = null;
 
   if (token.merchant_id) {
-    const { data: m } = await supa
+    const { data: m, error: mErr } = await supa
       .from("merchants")
       .select("name, tenant_id")
       .eq("id", token.merchant_id)
-      .maybeSingle<{ name: string; tenant_id: string | null }>();
-    merchantName = m?.name ?? null;
-    tenantId = m?.tenant_id ?? null;
+      .maybeSingle<MerchantRow>();
+    if (!mErr && m) {
+      merchantName = m.name ?? null;
+      tenantId = m.tenant_id ?? null;
+    }
   }
 
-  // 3) Mark token claimed + write ledger atomically (best via RPC/transaction—simple 2-step here)
-  // 3a) mark claimed
+  // 4) Mark token claimed first (idempotent guard with claimed_at is null)
   {
     const { error } = await supa
       .from("earn_tokens")
-      .update({ claimed_at: new Date().toISOString(), claimed_by_user_id: userId })
+      .update({
+        claimed_at: new Date().toISOString(),
+        // if you added this column:
+        // claimed_by_user_id: userId,
+      })
       .eq("code", code)
       .is("claimed_at", null);
     if (error) {
@@ -98,15 +111,15 @@ export async function POST(req: Request) {
     }
   }
 
-  // 3b) write ledger row
+  // 5) Write ledger row with attribution (tenant_id + merchant_id)
   {
     const { error } = await supa.from("points_ledger").insert({
       wallet_id: walletId,
       delta: token.points,
       event_type: "merchant_award",
       reason: merchantName ? `Award from ${merchantName}` : "Award from merchant",
-      tenant_id: tenantId,            // nullable if you’re not attributing yet
-      merchant_id: token.merchant_id, // nullable fine
+      tenant_id: tenantId,            // <- attribution by tenant
+      merchant_id: token.merchant_id, // <- attribution by merchant
     });
     if (error) {
       return NextResponse.json({ error: "Could not write ledger." }, { status: 500 });

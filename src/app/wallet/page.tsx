@@ -1,5 +1,7 @@
 // src/app/wallet/page.tsx
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 import { getTenantSlug } from "@/lib/tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -29,39 +31,50 @@ export default async function WalletPage() {
   const tenantSlug = await getTenantSlug(); // branding only
   const admin = createAdminClient();
 
-  // demo wallet (no auth for now)
+  // --- demo wallet (no auth for now)
   const demoUserId = process.env.DEMO_USER_ID!;
   const { data: wallet, error: wErr } = await admin
     .from("wallets")
     .select("id")
     .eq("user_id", demoUserId)
     .maybeSingle<Wallet>();
-  if (wErr) return <main className="p-6 text-red-600">Wallet lookup error: {wErr.message}</main>;
-  if (!wallet) return <main className="p-6">No wallet found for demo user {demoUserId}.</main>;
 
-  // unified balance (no tenant filter)
+  if (wErr) {
+    return <main className="p-6 text-red-600">Wallet lookup error: {wErr.message}</main>;
+  }
+  if (!wallet) {
+    return <main className="p-6">No wallet found for demo user {demoUserId}.</main>;
+  }
+
+  // --- unified balance (no tenant filter)
   const { data: totalRow, error: bErr } = await admin
     .from("wallet_balance_total")
     .select("balance")
     .eq("wallet_id", wallet.id)
     .maybeSingle<TotalBalanceRow>();
-  if (bErr) return <main className="p-6 text-red-600">Balance error: {bErr.message}</main>;
+
+  if (bErr) {
+    return <main className="p-6 text-red-600">Balance error: {bErr.message}</main>;
+  }
   const total = totalRow?.balance ?? 0;
 
-  // breakdown per tenant (informational)
+  // --- breakdown per tenant (informational)
   const { data: breakdownRows, error: brErr } = await admin
     .from("wallet_balance_by_tenant")
     .select("tenant_id, balance, tenants!inner(name,slug)")
     .eq("wallet_id", wallet.id)
     .returns<BreakdownRow[]>();
-  if (brErr) return <main className="p-6 text-red-600">Breakdown error: {brErr.message}</main>;
+
+  if (brErr) {
+    return <main className="p-6 text-red-600">Breakdown error: {brErr.message}</main>;
+  }
 
   const breakdown =
     (breakdownRows ?? [])
       .map((r) => ({ slug: r.tenants.slug, name: r.tenants.name, balance: r.balance }))
       .sort((a, b) => a.slug.localeCompare(b.slug));
 
-  // recent activity across all tenants
+  // --- recent activity across all tenants
   const { data: txns, error: lErr } = await admin
     .from("points_ledger")
     .select("created_at, event_type, delta, reason, tenants(name,slug)")
@@ -69,7 +82,10 @@ export default async function WalletPage() {
     .order("created_at", { ascending: false })
     .limit(10)
     .returns<TxnRow[]>();
-  if (lErr) return <main className="p-6 text-red-600">Ledger error: {lErr.message}</main>;
+
+  if (lErr) {
+    return <main className="p-6 text-red-600">Ledger error: {lErr.message}</main>;
+  }
 
   return (
     <main className="mx-auto max-w-xl p-6">
@@ -107,9 +123,15 @@ export default async function WalletPage() {
                   {r.event_type.replace("_", " ")} — {r.tenants?.name ?? "Unknown"}
                 </div>
                 {r.reason && <div className="text-xs text-slate-500">{r.reason}</div>}
-                <div className="text-xs text-slate-400">{new Date(r.created_at).toLocaleString()}</div>
+                <div className="text-xs text-slate-400">
+                  {new Date(r.created_at).toLocaleString()}
+                </div>
               </div>
-              <div className={`text-base font-semibold ${r.delta >= 0 ? "text-green-600" : "text-red-600"}`}>
+              <div
+                className={`text-base font-semibold ${
+                  r.delta >= 0 ? "text-green-600" : "text-red-600"
+                }`}
+              >
                 {r.delta > 0 ? `+${r.delta}` : r.delta}
               </div>
             </li>
