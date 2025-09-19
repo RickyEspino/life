@@ -1,4 +1,3 @@
-// src/app/signin/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -22,7 +21,12 @@ export default function SignInPage() {
 
       const params = new URLSearchParams(window.location.search);
       const next = params.get("next") || "/wallet";
-      const redirectTo = new URL(next, window.location.origin).toString();
+
+      // IMPORTANT: send the user to our callback page so the session is established
+      const redirectTo = new URL(
+        `/auth/callback?next=${encodeURIComponent(next)}`,
+        window.location.origin
+      ).toString();
 
       const { error } = await supa.auth.signInWithOtp({
         email,

@@ -2,16 +2,39 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getSupabaseBrowser } from "@/lib/supabase/browser";
 
 export default function ClaimPage() {
-  const [state, setState] = useState<"idle" | "ok" | "err">("idle");
-  const [msg, setMsg] = useState("Processing…");
+  const [state, setState] = useState<"checking" | "redeeming" | "ok" | "err">("checking");
+  const [msg, setMsg] = useState("Checking sign-in…");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
+    const supa = getSupabaseBrowser();
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("code");
+    const nextSelf = url.pathname + url.search; // e.g. /claim?code=...
 
-    function confetti(n = 120) {
+    async function ensureSignedIn() {
+      // 1) Require a code in the URL
+      if (!code) {
+        setState("err");
+        setMsg("Missing code.");
+        return false;
+      }
+
+      // 2) Check session
+      const { data } = await supa.auth.getSession();
+      if (!data.session) {
+        // Not signed in → go to signin with return path
+        const signinUrl = new URL("/signin", window.location.origin);
+        signinUrl.searchParams.set("next", nextSelf);
+        window.location.replace(signinUrl.toString());
+        return false; // stop flow; browser navigates away
+      }
+      return true;
+    }
+
+    function confetti(n = 140) {
       const frag = document.createDocumentFragment();
       for (let i = 0; i < n; i++) {
         const el = document.createElement("div");
@@ -22,7 +45,6 @@ export default function ClaimPage() {
         el.style.fontSize = 12 + Math.random() * 24 + "px";
         el.style.transition = "transform 1.2s ease-out, opacity 1.2s";
         frag.appendChild(el);
-        // async start to allow transition
         requestAnimationFrame(() => {
           el.style.transform = `translateY(${100 + Math.random() * 60}vh) rotate(${Math.random() * 720 - 360}deg)`;
           el.style.opacity = "0";
@@ -33,11 +55,9 @@ export default function ClaimPage() {
     }
 
     async function redeem() {
-      if (!code) {
-        setState("err");
-        setMsg("Missing code.");
-        return;
-      }
+      setState("redeeming");
+      setMsg("Processing…");
+
       try {
         const r = await fetch("/api/claim", {
           method: "POST",
@@ -52,7 +72,7 @@ export default function ClaimPage() {
         }
         setState("ok");
         setMsg(`+${j.points} points${j.merchantName ? ` from ${j.merchantName}` : ""}!`);
-        confetti(140);
+        confetti(150);
         setTimeout(() => {
           window.location.href = "/wallet";
         }, 1800);
@@ -62,14 +82,18 @@ export default function ClaimPage() {
       }
     }
 
-    redeem();
+    (async () => {
+      const proceed = await ensureSignedIn();
+      if (proceed) await redeem();
+    })();
   }, []);
+
+  const title =
+    state === "ok" ? "Success!" : state === "err" ? "Whoops…" : state === "checking" ? "Just a sec…" : "Claiming…";
 
   return (
     <main className="mx-auto max-w-md p-8 text-center space-y-4">
-      <h1 className="text-2xl font-semibold">
-        {state === "ok" ? "Success!" : state === "err" ? "Whoops…" : "Claiming…"}
-      </h1>
+      <h1 className="text-2xl font-semibold">{title}</h1>
       <p className="text-slate-600">{msg}</p>
     </main>
   );
