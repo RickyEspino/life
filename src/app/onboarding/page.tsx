@@ -13,14 +13,20 @@ export default function OnboardingPage() {
   const [err, setErr] = useState<string | null>(null);
 
   // root domain for redirect after selection (no protocol)
-  const ROOT_DOMAIN =
-    (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "beachlifeapp.com").replace(/^https?:\/\//, "");
+  const ROOT_DOMAIN = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "beachlifeapp.com").replace(
+    /^https?:\/\//,
+    ""
+  );
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supa.from("tenants").select("id,name,slug").order("slug");
+      const { data, error } = await supa
+        .from<Tenant>("tenants")
+        .select("id,name,slug")
+        .order("slug", { ascending: true });
+
       if (error) setErr(error.message);
-      else setTenants(data as Tenant[]);
+      else setTenants(data ?? []);
     })();
   }, [supa]);
 
@@ -33,8 +39,8 @@ export default function OnboardingPage() {
       setErr(null);
 
       // 1) get current user
-      const { data: session } = await supa.auth.getUser();
-      const user = session?.user;
+      const { data: userRes } = await supa.auth.getUser();
+      const user = userRes?.user;
       if (!user) {
         setErr("Your session expired. Please sign in again.");
         setBusy(false);
@@ -42,14 +48,17 @@ export default function OnboardingPage() {
       }
 
       // 2) set primary tenant in user_profiles
-      const { error: upErr } = await supa.from("user_profiles").upsert(
-        { user_id: user.id, primary_tenant_id: choice },
-        { onConflict: "user_id" }
-      );
-      if (upErr) throw upErr;
+      const { error: upErr } = await supa
+        .from("user_profiles")
+        .upsert({ user_id: user.id, primary_tenant_id: choice }, { onConflict: "user_id" });
 
-      // 3) ensure membership exists
-      // if you want unique (user_id, tenant_id), add a unique index
+      if (upErr) {
+        setErr(upErr.message);
+        setBusy(false);
+        return;
+      }
+
+      // 3) ensure membership exists (ignore conflict errors server-side via unique index, if present)
       await supa.from("user_tenants").insert({ user_id: user.id, tenant_id: choice }).select().maybeSingle();
 
       // 4) find chosen tenant slug for redirect
@@ -58,8 +67,9 @@ export default function OnboardingPage() {
 
       // 5) redirect to chosen subdomain dashboard
       window.location.href = `https://${slug}.${ROOT_DOMAIN}/wallet`;
-    } catch (e: any) {
-      setErr(e?.message || "Unable to save your selection. Please try again.");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Unable to save your selection. Please try again.";
+      setErr(message);
     } finally {
       setBusy(false);
     }
