@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/browser";
 
 type Tenant = { id: string; name: string; slug: string };
+// lightweight shapes for mutation payloads (no `any`)
+type UserProfileInsert = { user_id: string; primary_tenant_id: string };
+type UserTenantInsert = { user_id: string; tenant_id: string };
 
 export default function OnboardingPage() {
   const supa = useMemo(getSupabaseBrowser, []);
@@ -49,10 +52,15 @@ export default function OnboardingPage() {
         return;
       }
 
-      // 2) set primary tenant in user_profiles (array form avoids TS never)
+      // 2) set primary tenant in user_profiles
+      const profilePayload: UserProfileInsert[] = [
+        { user_id: user.id, primary_tenant_id: choice },
+      ];
+      // Cast to `never` to satisfy postgrest-js generic when no DB types are provided
       const { error: upErr } = await supa
         .from("user_profiles")
-        .upsert([{ user_id: user.id, primary_tenant_id: choice }], { onConflict: "user_id" });
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+        .upsert(profilePayload as unknown as never, { onConflict: "user_id" });
 
       if (upErr) {
         setErr(upErr.message);
@@ -60,10 +68,12 @@ export default function OnboardingPage() {
         return;
       }
 
-      // 3) ensure membership exists (array form; ok if unique index ignores duplicates)
+      // 3) ensure membership exists (ignore duplicate via unique index if present)
+      const membershipPayload: UserTenantInsert[] = [{ user_id: user.id, tenant_id: choice }];
       await supa
         .from("user_tenants")
-        .insert([{ user_id: user.id, tenant_id: choice }])
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+        .insert(membershipPayload as unknown as never)
         .select()
         .maybeSingle();
 
