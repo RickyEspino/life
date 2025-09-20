@@ -1,21 +1,18 @@
 // src/lib/supabase/browser.ts
-import { createClient } from '@supabase/supabase-js';
+"use client";
 
-let _client: ReturnType<typeof createClient> | null = null;
+import { createBrowserClient } from "@supabase/ssr";
 
 export function getSupabaseBrowser() {
-  if (_client) return _client;
-
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  if (!url || !anon) throw new Error('Missing Supabase envs in browser client');
+  if (!url) throw new Error("SUPABASE: NEXT_PUBLIC_SUPABASE_URL is missing");
+  if (!anon) throw new Error("SUPABASE: NEXT_PUBLIC_SUPABASE_ANON_KEY is missing");
 
-  _client = createClient(url, anon, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
+  // IMPORTANT: scope cookies to parent domain so session is shared across subdomains
+  const cookieDomain = process.env.NEXT_PUBLIC_COOKIE_DOMAIN; // e.g. ".beachlifeapp.com"
+
+  return createBrowserClient(url, anon, {
+    cookieOptions: cookieDomain ? { domain: cookieDomain } : undefined,
   });
-  return _client;
 }
