@@ -1,64 +1,53 @@
 // src/app/auth/callback/route.ts
-import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase/server"; // uses async cookies in Next 15
+import { NextResponse } from 'next/server';
+import { getSupabaseServer } from '@/lib/supabase/server';
 
-function toAbs(url: URL, next: string) {
+function nextUrlOr(defaultPath: string, url: URL) {
+  const n = url.searchParams.get('next');
+  if (!n) return defaultPath;
   try {
-    return new URL(next, url.origin).toString();
+    // relative-only safety
+    const u = new URL(n, url.origin);
+    if (u.origin !== url.origin) return defaultPath;
+    return u.pathname + u.search + u.hash;
   } catch {
-    return url.origin;
+    return defaultPath;
   }
 }
 
-export async function GET(req: Request) {
-  const url = new URL(req.url);
+export async function GET(request: Request) {
+  const url = new URL(request.url);
   const supabase = getSupabaseServer();
 
-  // 1) Exchange the ?code=... for a session cookie on this domain
-  const code = url.searchParams.get("code");
-  if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) {
-      return NextResponse.redirect(new URL(`/signin?error=${encodeURIComponent(error.message)}`, url.origin));
-    }
-  } else {
-    // no code? send to signin
-    return NextResponse.redirect(new URL("/signin?error=missing_code", url.origin));
+  // 1) Create session cookie on this domain from the code in the URL
+  // (email magic links & OAuth both land here)
+  const { error: exchErr } = await supabase.auth.exchangeCodeForSession(request.url);
+  if (exchErr) {
+    // If exchange fails, send back to signin with a message
+    const back = new URL('/signin', url.origin);
+    back.searchParams.set('error', exchErr.message);
+    return NextResponse.redirect(back);
   }
 
-  // 2) Honor explicit ?next=
-  const next = url.searchParams.get("next");
-  if (next) {
-    return NextResponse.redirect(toAbs(url, next));
+  // 2) Determine where to go next
+  // If user has a profile with a primary_tenant_id, go to /wallet
+  // else go to /onboarding
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.redirect(new URL('/signin', url.origin));
   }
 
-  // 3) Otherwise, if user has a primary tenant, jump to its subdomain dashboard
-  const { data: userRes } = await supabase.auth.getUser();
-  const user = userRes?.user;
+  const { data: prof } = await supabase
+    .from('user_profiles')
+    .select('primary_tenant_id')
+    .eq('user_id', user.id)
+    .maybeSingle<{ primary_tenant_id: string | null }>();
 
-  const ROOT =
-    (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "beachlifeapp.com").replace(/^https?:\/\//, "");
+  const defaultDest = prof?.primary_tenant_id ? '/wallet' : '/onboarding';
+  const dest = nextUrlOr(defaultDest, url);
 
-  if (user) {
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("primary_tenant_id")
-      .eq("user_id", user.id)
-      .maybeSingle<{ primary_tenant_id: string | null }>();
-
-    if (profile?.primary_tenant_id) {
-      const { data: tenant } = await supabase
-        .from("tenants")
-        .select("slug")
-        .eq("id", profile.primary_tenant_id)
-        .maybeSingle<{ slug: string }>();
-
-      if (tenant?.slug) {
-        return NextResponse.redirect(`https://${tenant.slug}.${ROOT}/wallet`);
-      }
-    }
-  }
-
-  // 4) New users (or no profile yet) → onboarding
-  return NextResponse.redirect(new URL("/onboarding", url.origin));
+  return NextResponse.redirect(new URL(dest, url.origin));
 }

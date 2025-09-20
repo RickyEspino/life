@@ -1,30 +1,28 @@
 // src/lib/supabase/server.ts
 import 'server-only';
+import { cookies } from 'next/headers';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { cookies as nextCookies } from 'next/headers';
-
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-if (!url) throw new Error('SUPABASE: NEXT_PUBLIC_SUPABASE_URL is missing');
-if (!anon) throw new Error('SUPABASE: NEXT_PUBLIC_SUPABASE_ANON_KEY is missing');
 
 export function getSupabaseServer() {
+  const cookieStore = cookies();
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  if (!url) throw new Error('SUPABASE: NEXT_PUBLIC_SUPABASE_URL is missing');
+  if (!anon) throw new Error('SUPABASE: NEXT_PUBLIC_SUPABASE_ANON_KEY is missing');
+
   return createServerClient(url, anon, {
     cookies: {
-      // Next 15: `cookies()` is async in RSC/route contexts.
-      async get(name: string) {
-        const store = await nextCookies();
-        return store.get(name)?.value;
+      get(name: string) {
+        const c = cookieStore.get(name);
+        return c?.value;
       },
-      async set(name: string, value: string, options: CookieOptions) {
-        const store = await nextCookies();
-        store.set({ name, value, ...options });
+      set(name: string, value: string, options: CookieOptions) {
+        // Next 15 requires writing through the cookie store
+        cookieStore.set({ name, value, ...options });
       },
-      async remove(name: string, options: CookieOptions) {
-        const store = await nextCookies();
-        // Supabase’s helper expects remove; emulate via a set with maxAge=0
-        store.set({ name, value: '', ...options, maxAge: 0 });
+      remove(name: string, options: CookieOptions) {
+        cookieStore.set({ name, value: '', ...options, maxAge: 0 });
       },
     },
   });
