@@ -49,10 +49,10 @@ export default function OnboardingPage() {
         return;
       }
 
-      // 2) set primary tenant in user_profiles
+      // 2) set primary tenant in user_profiles (array form avoids TS never)
       const { error: upErr } = await supa
         .from("user_profiles")
-        .upsert({ user_id: user.id, primary_tenant_id: choice }, { onConflict: "user_id" });
+        .upsert([{ user_id: user.id, primary_tenant_id: choice }], { onConflict: "user_id" });
 
       if (upErr) {
         setErr(upErr.message);
@@ -60,10 +60,10 @@ export default function OnboardingPage() {
         return;
       }
 
-      // 3) ensure membership exists (ignore conflict if unique index exists)
+      // 3) ensure membership exists (array form; ok if unique index ignores duplicates)
       await supa
         .from("user_tenants")
-        .insert({ user_id: user.id, tenant_id: choice })
+        .insert([{ user_id: user.id, tenant_id: choice }])
         .select()
         .maybeSingle();
 
