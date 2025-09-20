@@ -6,15 +6,8 @@ import { getSupabaseBrowser } from "@/lib/supabase/browser";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type Tenant = { id: string; name: string; slug: string };
-
-type UserProfilesRow = {
-  user_id: string;
-  primary_tenant_id: string | null;
-};
-
 type WalletRow = { id: string; user_id: string };
-
-type UserTenantsRow = { user_id: string; tenant_id: string };
+type UserProfilesRow = { user_id: string; primary_tenant_id: string | null };
 
 export default function OnboardingPage() {
   const supa = useMemo(getSupabaseBrowser, []);
@@ -22,11 +15,10 @@ export default function OnboardingPage() {
   const qp = useSearchParams();
 
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [saving, setSaving] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Load tenants for the picker
   useEffect(() => {
     let mounted = true;
 
@@ -34,18 +26,17 @@ export default function OnboardingPage() {
       setLoading(true);
       setErr(null);
 
-      // Ensure user is authed
       const { data: auth } = await supa.auth.getUser();
       if (!auth.user) {
         router.replace("/signin?next=/onboarding");
         return;
       }
 
-      // Fetch tenants with explicit row type
       const { data, error } = await supa
-        .from<Tenant>("tenants")
+        .from("tenants")
         .select("id,name,slug")
-        .order("slug", { ascending: true });
+        .order("slug", { ascending: true })
+        .returns<Tenant[]>(); // <- put the type on the result
 
       if (!mounted) return;
 
@@ -72,17 +63,16 @@ export default function OnboardingPage() {
       return;
     }
 
-    // 1) upsert user_profiles (primary tenant) — make 'from' generic!
+    // 1) Upsert user_profiles (primary lifestyle)
     const upsertPayload: UserProfilesRow = {
       user_id: user.id,
       primary_tenant_id: tenantId,
     };
 
     const { error: upErr } = await supa
-      .from<UserProfilesRow>("user_profiles")
-      .upsert(upsertPayload, { onConflict: "user_id" })
-      .select()
-      .single();
+      .from("user_profiles")
+      // @ts-expect-error: without generated DB types, upsert params are untyped
+      .upsert(upsertPayload, { onConflict: "user_id" });
 
     if (upErr) {
       setSaving(false);
@@ -90,12 +80,12 @@ export default function OnboardingPage() {
       return;
     }
 
-    // 2) ensure a wallet exists for this user
-    const { data: walletRow, error: wReadErr } = await supa
-      .from<WalletRow>("wallets")
+    // 2) Ensure wallet exists
+    const { data: wallet, error: wReadErr } = await supa
+      .from("wallets")
       .select("id,user_id")
       .eq("user_id", user.id)
-      .maybeSingle();
+      .maybeSingle<WalletRow>();
 
     if (wReadErr) {
       setSaving(false);
@@ -103,12 +93,12 @@ export default function OnboardingPage() {
       return;
     }
 
-    if (!walletRow) {
+    if (!wallet) {
       const { error: wInsErr } = await supa
-        .from<WalletRow>("wallets")
+        .from("wallets")
         .insert({ user_id: user.id })
         .select("id")
-        .single();
+        .maybeSingle<WalletRow>();
       if (wInsErr) {
         setSaving(false);
         setErr(wInsErr.message);
@@ -116,17 +106,7 @@ export default function OnboardingPage() {
       }
     }
 
-    // 3) optional: add membership in user_tenants (ignore duplicates)
-    const { error: utErr } = await supa
-      .from<UserTenantsRow>("user_tenants")
-      .insert({ user_id: user.id, tenant_id: tenantId });
-
-    if (utErr && !/duplicate|unique/i.test(utErr.message)) {
-      setSaving(false);
-      setErr(utErr.message);
-      return;
-    }
-
+    // 3) Go to the next page (default /wallet)
     const next = qp.get("next") || "/wallet";
     router.replace(next);
   }
