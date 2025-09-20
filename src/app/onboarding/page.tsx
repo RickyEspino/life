@@ -1,3 +1,4 @@
+// src/app/onboarding/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -21,9 +22,10 @@ export default function OnboardingPage() {
   useEffect(() => {
     (async () => {
       const { data, error } = await supa
-        .from<Tenant>("tenants")
+        .from("tenants")
         .select("id,name,slug")
-        .order("slug", { ascending: true });
+        .order("slug", { ascending: true })
+        .returns<Tenant[]>();
 
       if (error) setErr(error.message);
       else setTenants(data ?? []);
@@ -58,8 +60,12 @@ export default function OnboardingPage() {
         return;
       }
 
-      // 3) ensure membership exists (ignore conflict errors server-side via unique index, if present)
-      await supa.from("user_tenants").insert({ user_id: user.id, tenant_id: choice }).select().maybeSingle();
+      // 3) ensure membership exists (ignore conflict if unique index exists)
+      await supa
+        .from("user_tenants")
+        .insert({ user_id: user.id, tenant_id: choice })
+        .select()
+        .maybeSingle();
 
       // 4) find chosen tenant slug for redirect
       const t = tenants.find((x) => x.id === choice);
@@ -68,7 +74,8 @@ export default function OnboardingPage() {
       // 5) redirect to chosen subdomain dashboard
       window.location.href = `https://${slug}.${ROOT_DOMAIN}/wallet`;
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Unable to save your selection. Please try again.";
+      const message =
+        e instanceof Error ? e.message : "Unable to save your selection. Please try again.";
       setErr(message);
     } finally {
       setBusy(false);
