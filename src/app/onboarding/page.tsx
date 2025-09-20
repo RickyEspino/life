@@ -1,3 +1,4 @@
+// src/app/onboarding/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -62,7 +63,6 @@ export default function OnboardingPage() {
       return;
     }
 
-    // Find the chosen tenant object (for slug-based redirect later)
     const chosen = tenants.find((t) => t.id === tenantId);
     if (!chosen) {
       setSaving(false);
@@ -78,7 +78,6 @@ export default function OnboardingPage() {
 
     const { error: upErr } = await supa
       .from("user_profiles")
-      // @ts-expect-error: insert/upsert params are untyped without DB generics – safe to ignore for this call.
       .upsert(upsertPayload, { onConflict: "user_id" });
 
     if (upErr) {
@@ -103,8 +102,7 @@ export default function OnboardingPage() {
     if (!wallet) {
       const { error: wInsErr } = await supa
         .from("wallets")
-        // @ts-expect-error: payload is structurally correct; DB generic types omitted here
-        .insert({ user_id: user.id })
+        .insert({ user_id: user.id } as never) // minimal cast to satisfy generic inference
         .select("id,user_id")
         .maybeSingle<WalletRow>();
 
@@ -116,14 +114,12 @@ export default function OnboardingPage() {
     }
 
     // 3) Where to next?
-    // If a ?next= was provided, respect it. Otherwise, send to the chosen lifestyle's subdomain /wallet.
     const next = qp.get("next");
     if (next) {
       router.replace(next);
     } else {
-      // This relies on your auth cookie domain being .beachlifeapp.com
+      // cross-subdomain redirect to selected lifestyle
       const dest = `https://${chosen.slug}.beachlifeapp.com/wallet`;
-      // Hard navigation to ensure we're on the subdomain context
       window.location.assign(dest);
     }
   }
