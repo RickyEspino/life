@@ -1,4 +1,3 @@
-// src/app/signin/page.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -11,6 +10,7 @@ export default function SignInPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // Single, allowed callback origin (e.g., https://beachlifeapp.com)
   const AUTH_BASE = useMemo(() => {
     const v = process.env.NEXT_PUBLIC_AUTH_BASE;
     if (!v) console.warn("NEXT_PUBLIC_AUTH_BASE is not set");
@@ -25,20 +25,29 @@ export default function SignInPage() {
 
     try {
       const supa = getSupabaseBrowser();
+
+      // Default new users to onboarding; if ?next= is present, respect it
       const params = new URLSearchParams(window.location.search);
       const next = params.get("next") || "/onboarding";
+
+      // Always send the email link to our single callback host
       const redirectTo = `${AUTH_BASE}/auth/callback?next=${encodeURIComponent(next)}`;
 
       const { error } = await supa.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
+        options: {
+          emailRedirectTo: redirectTo,
+          shouldCreateUser: true,
+        },
       });
 
-      if (error) setErr(error.message);
-      else setMsg("Check your email for a sign-in link.");
-    } catch (e) {
+      if (error) {
+        setErr(error.message);
+      } else {
+        setMsg("Check your email for a sign-in link. It expires shortly.");
+      }
+    } catch {
       setErr("Something went wrong. Please try again.");
-      // console.error(e);
     } finally {
       setBusy(false);
     }
@@ -47,7 +56,9 @@ export default function SignInPage() {
   return (
     <main className="mx-auto max-w-md p-6">
       <h1 className="text-2xl font-semibold">Sign in</h1>
-      <p className="mt-2 text-slate-600">Use your email to receive a secure, one-time sign-in link.</p>
+      <p className="mt-2 text-slate-600">
+        Use your email to receive a secure, one-time sign-in link.
+      </p>
 
       <form onSubmit={handleMagicLink} className="mt-6 space-y-4">
         <label className="block">
@@ -79,12 +90,15 @@ export default function SignInPage() {
           {err}
           <br />
           <span className="text-xs text-slate-500">
-            If this mentions redirect URL, add <code>{AUTH_BASE}/auth/callback*</code> to Supabase → Auth → Redirect URLs.
+            If this mentions redirect URL, add{" "}
+            <code>{AUTH_BASE}/auth/callback*</code> to Supabase → Auth → Redirect URLs.
           </span>
         </p>
       )}
 
-      <p className="mt-8 text-xs text-slate-500">Debug: AUTH_BASE = <code>{AUTH_BASE || "(not set)"}</code></p>
+      <p className="mt-8 text-xs text-slate-500">
+        Debug: AUTH_BASE = <code>{AUTH_BASE || "(not set)"}</code>
+      </p>
 
       <p className="mt-4 text-sm text-slate-500">
         By continuing you agree to our <Link href="/terms" className="underline">Terms</Link> and{" "}

@@ -1,4 +1,3 @@
-// src/app/onboarding/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -36,7 +35,7 @@ export default function OnboardingPage() {
         .from("tenants")
         .select("id,name,slug")
         .order("slug", { ascending: true })
-        .returns<Tenant[]>(); // place types on the result
+        .returns<Tenant[]>();
 
       if (!mounted) return;
 
@@ -63,6 +62,14 @@ export default function OnboardingPage() {
       return;
     }
 
+    // Find the chosen tenant object (for slug-based redirect later)
+    const chosen = tenants.find((t) => t.id === tenantId);
+    if (!chosen) {
+      setSaving(false);
+      setErr("That lifestyle is no longer available. Please refresh.");
+      return;
+    }
+
     // 1) Upsert user_profiles (set primary lifestyle)
     const upsertPayload: UserProfilesRow = {
       user_id: user.id,
@@ -71,8 +78,7 @@ export default function OnboardingPage() {
 
     const { error: upErr } = await supa
       .from("user_profiles")
-      // Without generated DB types, suppress this one call:
-      // @ts-expect-error intentional: insert/upsert params are untyped without DB generics
+      // @ts-expect-error: insert/upsert params are untyped without DB generics – safe to ignore for this call.
       .upsert(upsertPayload, { onConflict: "user_id" });
 
     if (upErr) {
@@ -97,7 +103,7 @@ export default function OnboardingPage() {
     if (!wallet) {
       const { error: wInsErr } = await supa
         .from("wallets")
-        // @ts-expect-error intentional: insert payload typed via the select below
+        // @ts-expect-error: payload is structurally correct; DB generic types omitted here
         .insert({ user_id: user.id })
         .select("id,user_id")
         .maybeSingle<WalletRow>();
@@ -109,9 +115,17 @@ export default function OnboardingPage() {
       }
     }
 
-    // 3) Go to next (default /wallet)
-    const next = qp.get("next") || "/wallet";
-    router.replace(next);
+    // 3) Where to next?
+    // If a ?next= was provided, respect it. Otherwise, send to the chosen lifestyle's subdomain /wallet.
+    const next = qp.get("next");
+    if (next) {
+      router.replace(next);
+    } else {
+      // This relies on your auth cookie domain being .beachlifeapp.com
+      const dest = `https://${chosen.slug}.beachlifeapp.com/wallet`;
+      // Hard navigation to ensure we're on the subdomain context
+      window.location.assign(dest);
+    }
   }
 
   return (
