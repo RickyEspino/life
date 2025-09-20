@@ -1,53 +1,40 @@
 // src/app/auth/callback/route.ts
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { getSupabaseServer } from '@/lib/supabase/server';
 
-function nextUrlOr(defaultPath: string, url: URL) {
-  const n = url.searchParams.get('next');
-  if (!n) return defaultPath;
+function toAbs(url: URL, next: string) {
   try {
-    // relative-only safety
-    const u = new URL(n, url.origin);
-    if (u.origin !== url.origin) return defaultPath;
-    return u.pathname + u.search + u.hash;
+    return new URL(next, url.origin).toString();
   } catch {
-    return defaultPath;
+    return url.origin + '/wallet';
   }
 }
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
+export async function GET(req: Request) {
+  const url = new URL(req.url);
   const supabase = getSupabaseServer();
 
-  // 1) Create session cookie on this domain from the code in the URL
-  // (email magic links & OAuth both land here)
-  const { error: exchErr } = await supabase.auth.exchangeCodeForSession(request.url);
-  if (exchErr) {
-    // If exchange fails, send back to signin with a message
-    const back = new URL('/signin', url.origin);
-    back.searchParams.set('error', exchErr.message);
-    return NextResponse.redirect(back);
-  }
+  // 1) Exchange code & state for session cookies (set-cookie on this host)
+  await supabase.auth.exchangeCodeForSession(url.toString());
 
-  // 2) Determine where to go next
-  // If user has a profile with a primary_tenant_id, go to /wallet
-  // else go to /onboarding
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 2) Verify we now have a user
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.redirect(new URL('/signin', url.origin));
-  }
+  // Optional: set a friendly flag cookie you can read client-side for UX
+  const jar = await cookies();
+  jar.set({
+    name: 'lf_signed_in',
+    value: user ? '1' : '0',
+    httpOnly: false,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 15,
+  });
 
-  const { data: prof } = await supabase
-    .from('user_profiles')
-    .select('primary_tenant_id')
-    .eq('user_id', user.id)
-    .maybeSingle<{ primary_tenant_id: string | null }>();
+  // 3) Where to go next
+  const nextParam = url.searchParams.get('next');
+  const next = nextParam ? toAbs(url, nextParam) : (user ? '/onboarding' : '/signin');
 
-  const defaultDest = prof?.primary_tenant_id ? '/wallet' : '/onboarding';
-  const dest = nextUrlOr(defaultDest, url);
-
-  return NextResponse.redirect(new URL(dest, url.origin));
+  return NextResponse.redirect(next);
 }
