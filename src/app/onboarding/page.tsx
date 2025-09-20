@@ -36,7 +36,7 @@ export default function OnboardingPage() {
         .from("tenants")
         .select("id,name,slug")
         .order("slug", { ascending: true })
-        .returns<Tenant[]>(); // <- put the type on the result
+        .returns<Tenant[]>(); // place types on the result
 
       if (!mounted) return;
 
@@ -63,7 +63,7 @@ export default function OnboardingPage() {
       return;
     }
 
-    // 1) Upsert user_profiles (primary lifestyle)
+    // 1) Upsert user_profiles (set primary lifestyle)
     const upsertPayload: UserProfilesRow = {
       user_id: user.id,
       primary_tenant_id: tenantId,
@@ -71,7 +71,8 @@ export default function OnboardingPage() {
 
     const { error: upErr } = await supa
       .from("user_profiles")
-      // @ts-expect-error: without generated DB types, upsert params are untyped
+      // Without generated DB types, suppress this one call:
+      // @ts-expect-error intentional: insert/upsert params are untyped without DB generics
       .upsert(upsertPayload, { onConflict: "user_id" });
 
     if (upErr) {
@@ -80,7 +81,7 @@ export default function OnboardingPage() {
       return;
     }
 
-    // 2) Ensure wallet exists
+    // 2) Ensure wallet exists for this user
     const { data: wallet, error: wReadErr } = await supa
       .from("wallets")
       .select("id,user_id")
@@ -96,9 +97,11 @@ export default function OnboardingPage() {
     if (!wallet) {
       const { error: wInsErr } = await supa
         .from("wallets")
+        // @ts-expect-error intentional: insert payload typed via the select below
         .insert({ user_id: user.id })
-        .select("id")
+        .select("id,user_id")
         .maybeSingle<WalletRow>();
+
       if (wInsErr) {
         setSaving(false);
         setErr(wInsErr.message);
@@ -106,7 +109,7 @@ export default function OnboardingPage() {
       }
     }
 
-    // 3) Go to the next page (default /wallet)
+    // 3) Go to next (default /wallet)
     const next = qp.get("next") || "/wallet";
     router.replace(next);
   }
