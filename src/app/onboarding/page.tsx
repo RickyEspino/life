@@ -14,6 +14,8 @@ type UserProfilesRow = {
 
 type WalletRow = { id: string; user_id: string };
 
+type UserTenantsRow = { user_id: string; tenant_id: string };
+
 export default function OnboardingPage() {
   const supa = useMemo(getSupabaseBrowser, []);
   const router = useRouter();
@@ -39,20 +41,17 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Fetch list of tenants
+      // Fetch tenants with explicit row type
       const { data, error } = await supa
-        .from("tenants")
+        .from<Tenant>("tenants")
         .select("id,name,slug")
-        .order("slug", { ascending: true })
-        .returns<Tenant[]>();
+        .order("slug", { ascending: true });
 
       if (!mounted) return;
 
-      if (error) {
-        setErr(error.message);
-      } else {
-        setTenants(data ?? []);
-      }
+      if (error) setErr(error.message);
+      else setTenants(data ?? []);
+
       setLoading(false);
     })();
 
@@ -65,7 +64,6 @@ export default function OnboardingPage() {
     setSaving(true);
     setErr(null);
 
-    // Verify auth again to be safe
     const { data: auth } = await supa.auth.getUser();
     const user = auth.user;
     if (!user) {
@@ -74,15 +72,15 @@ export default function OnboardingPage() {
       return;
     }
 
-    // 1) upsert user_profiles (primary tenant)
+    // 1) upsert user_profiles (primary tenant) — make 'from' generic!
     const upsertPayload: UserProfilesRow = {
       user_id: user.id,
       primary_tenant_id: tenantId,
     };
 
     const { error: upErr } = await supa
-      .from("user_profiles")
-      .upsert([upsertPayload], { onConflict: "user_id" })
+      .from<UserProfilesRow>("user_profiles")
+      .upsert(upsertPayload, { onConflict: "user_id" })
       .select()
       .single();
 
@@ -92,12 +90,12 @@ export default function OnboardingPage() {
       return;
     }
 
-    // 2) ensure a wallet exists for this user (create if missing)
+    // 2) ensure a wallet exists for this user
     const { data: walletRow, error: wReadErr } = await supa
-      .from("wallets")
+      .from<WalletRow>("wallets")
       .select("id,user_id")
       .eq("user_id", user.id)
-      .maybeSingle<WalletRow>();
+      .maybeSingle();
 
     if (wReadErr) {
       setSaving(false);
@@ -107,8 +105,8 @@ export default function OnboardingPage() {
 
     if (!walletRow) {
       const { error: wInsErr } = await supa
-        .from("wallets")
-        .insert([{ user_id: user.id }])
+        .from<WalletRow>("wallets")
+        .insert({ user_id: user.id })
         .select("id")
         .single();
       if (wInsErr) {
@@ -118,19 +116,17 @@ export default function OnboardingPage() {
       }
     }
 
-    // 3) optional: add to user_tenants (membership)
+    // 3) optional: add membership in user_tenants (ignore duplicates)
     const { error: utErr } = await supa
-      .from("user_tenants")
-      .insert([{ user_id: user.id, tenant_id: tenantId }], { defaultToNull: true });
+      .from<UserTenantsRow>("user_tenants")
+      .insert({ user_id: user.id, tenant_id: tenantId });
 
-    // Ignore duplicate membership errors; only block on other errors
     if (utErr && !/duplicate|unique/i.test(utErr.message)) {
       setSaving(false);
       setErr(utErr.message);
       return;
     }
 
-    // Done → go where they intended, or to wallet
     const next = qp.get("next") || "/wallet";
     router.replace(next);
   }
