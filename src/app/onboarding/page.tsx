@@ -1,98 +1,169 @@
 // src/app/onboarding/page.tsx
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { getSupabaseBrowser } from '@/lib/supabase/browser';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from "react";
+import { getSupabaseBrowser } from "@/lib/supabase/browser";
+import { useRouter, useSearchParams } from "next/navigation";
 
-type TenantRow = { id: string; name: string; slug: string };
+type Tenant = { id: string; name: string; slug: string };
+
+type UserProfilesRow = {
+  user_id: string;
+  primary_tenant_id: string | null;
+};
+
+type WalletRow = { id: string; user_id: string };
 
 export default function OnboardingPage() {
+  const supa = useMemo(getSupabaseBrowser, []);
   const router = useRouter();
-  const [tenants, setTenants] = useState<TenantRow[]>([]);
-  const [choice, setChoice] = useState<string>('');
-  const [busy, setBusy] = useState(false);
+  const qp = useSearchParams();
+
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Load tenants for the picker
   useEffect(() => {
+    let mounted = true;
+
     (async () => {
-      const supa = getSupabaseBrowser();
+      setLoading(true);
+      setErr(null);
+
+      // Ensure user is authed
+      const { data: auth } = await supa.auth.getUser();
+      if (!auth.user) {
+        router.replace("/signin?next=/onboarding");
+        return;
+      }
+
+      // Fetch list of tenants
       const { data, error } = await supa
-        .from('tenants')
-        .select('id,name,slug')
-        .order('slug', { ascending: true });
-      if (error) setErr(error.message);
-      else setTenants(data ?? []);
+        .from("tenants")
+        .select("id,name,slug")
+        .order("slug", { ascending: true })
+        .returns<Tenant[]>();
+
+      if (!mounted) return;
+
+      if (error) {
+        setErr(error.message);
+      } else {
+        setTenants(data ?? []);
+      }
+      setLoading(false);
     })();
-  }, []);
 
-  async function saveChoice() {
-    setBusy(true);
+    return () => {
+      mounted = false;
+    };
+  }, [router, supa]);
+
+  async function handlePick(tenantId: string) {
+    setSaving(true);
     setErr(null);
-    try {
-      const supa = getSupabaseBrowser();
-      const { data: u } = await supa.auth.getUser();
-      const user = u?.user;
-      if (!user) {
-        router.replace('/signin?next=/onboarding');
-        return;
-      }
 
-      // upsert the profile
-      const { error: upErr } = await supa
-        .from('user_profiles')
-        .upsert(
-          { user_id: user.id, primary_tenant_id: choice },
-          { onConflict: 'user_id' }
-        );
-      if (upErr) {
-        setErr(upErr.message);
-        return;
-      }
-
-      // (Optional) create a wallet now if one doesn’t exist
-      await supa.rpc('ensure_wallet_for_user', { p_user_id: user.id }).catch(() => {});
-
-      router.replace('/wallet');
-    } catch (e: any) {
-      setErr(e?.message ?? 'Something went wrong.');
-    } finally {
-      setBusy(false);
+    // Verify auth again to be safe
+    const { data: auth } = await supa.auth.getUser();
+    const user = auth.user;
+    if (!user) {
+      setSaving(false);
+      router.replace("/signin?next=/onboarding");
+      return;
     }
+
+    // 1) upsert user_profiles (primary tenant)
+    const upsertPayload: UserProfilesRow = {
+      user_id: user.id,
+      primary_tenant_id: tenantId,
+    };
+
+    const { error: upErr } = await supa
+      .from("user_profiles")
+      .upsert([upsertPayload], { onConflict: "user_id" })
+      .select()
+      .single();
+
+    if (upErr) {
+      setSaving(false);
+      setErr(upErr.message);
+      return;
+    }
+
+    // 2) ensure a wallet exists for this user (create if missing)
+    const { data: walletRow, error: wReadErr } = await supa
+      .from("wallets")
+      .select("id,user_id")
+      .eq("user_id", user.id)
+      .maybeSingle<WalletRow>();
+
+    if (wReadErr) {
+      setSaving(false);
+      setErr(wReadErr.message);
+      return;
+    }
+
+    if (!walletRow) {
+      const { error: wInsErr } = await supa
+        .from("wallets")
+        .insert([{ user_id: user.id }])
+        .select("id")
+        .single();
+      if (wInsErr) {
+        setSaving(false);
+        setErr(wInsErr.message);
+        return;
+      }
+    }
+
+    // 3) optional: add to user_tenants (membership)
+    const { error: utErr } = await supa
+      .from("user_tenants")
+      .insert([{ user_id: user.id, tenant_id: tenantId }], { defaultToNull: true });
+
+    // Ignore duplicate membership errors; only block on other errors
+    if (utErr && !/duplicate|unique/i.test(utErr.message)) {
+      setSaving(false);
+      setErr(utErr.message);
+      return;
+    }
+
+    // Done → go where they intended, or to wallet
+    const next = qp.get("next") || "/wallet";
+    router.replace(next);
   }
 
   return (
     <main className="mx-auto max-w-xl p-6">
-      <h1 className="text-2xl font-semibold">Pick your lifestyle</h1>
-      <p className="mt-2 text-slate-600">Choose the lifestyle to personalize your experience.</p>
+      <h1 className="text-2xl font-semibold">Choose your lifestyle</h1>
+      <p className="mt-2 text-slate-600">
+        Pick the lifestyle you want to start with. You can switch later — your points are unified.
+      </p>
 
-      <div className="mt-6 grid gap-3">
-        {tenants.map((t) => (
-          <label key={t.id} className="flex items-center gap-3 rounded-lg border p-3">
-            <input
-              type="radio"
-              name="tenant"
-              value={t.id}
-              checked={choice === t.id}
-              onChange={() => setChoice(t.id)}
-            />
-            <div>
-              <div className="font-medium">{t.name}</div>
-              <div className="text-xs text-slate-500">{t.slug}</div>
-            </div>
-          </label>
-        ))}
-      </div>
+      {loading ? (
+        <div className="mt-6 text-sm text-slate-500">Loading…</div>
+      ) : tenants.length === 0 ? (
+        <div className="mt-6 text-sm text-slate-500">No lifestyles available.</div>
+      ) : (
+        <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {tenants.map((t) => (
+            <li key={t.id}>
+              <button
+                disabled={saving}
+                onClick={() => handlePick(t.id)}
+                className="w-full rounded-xl border bg-white p-4 text-left hover:shadow disabled:opacity-50"
+              >
+                <div className="text-lg font-medium">{t.name}</div>
+                <div className="text-xs text-slate-500">/{t.slug}</div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      <button
-        className="mt-6 w-full rounded-md bg-black text-white py-2 font-medium disabled:opacity-50"
-        disabled={!choice || busy}
-        onClick={saveChoice}
-      >
-        {busy ? 'Saving…' : 'Continue'}
-      </button>
-
-      {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
+      {err && <p className="mt-4 text-sm text-red-600">{err}</p>}
     </main>
   );
 }
